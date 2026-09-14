@@ -1,15 +1,10 @@
+import { StatusCodes } from 'http-status-codes';
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
 import { openDatabase } from '../database';
 import { createApp } from '../server';
 
-const ok = 200;
-const badRequest = 400;
-const methodNotAllowed = 405;
-const payloadTooLarge = 413;
-const unsupportedMediaType = 415;
-const internalServerError = 500;
 const oversizedLength = 65537;
 
 void it('matches a complete submission without storing user answers', async (context) => {
@@ -60,7 +55,7 @@ void it('matches a complete submission without storing user answers', async (con
       const snapshot = database.prepare('SELECT * FROM party_answers ORDER BY id').all();
       const response = await post({ answers });
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       strictEqual(response.headers.get('content-type'), 'application/json; charset=utf-8');
       deepStrictEqual(await response.json(), {
         totalAnswers: 3,
@@ -96,7 +91,7 @@ void it('matches a complete submission without storing user answers', async (con
       for (const body of invalidBodies) {
         const response = await post(body);
 
-        strictEqual(response.status, badRequest, JSON.stringify(body));
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
         await response.text();
       }
     });
@@ -105,31 +100,31 @@ void it('matches a complete submission without storing user answers', async (con
       for (const body of ['', '{']) {
         const response = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body });
 
-        strictEqual(response.status, badRequest);
+        strictEqual(response.status, StatusCodes.BAD_REQUEST);
         await response.text();
       }
 
       const wrongType = await fetch(url, { method: 'POST', body: JSON.stringify({ answers }) });
 
-      strictEqual(wrongType.status, unsupportedMediaType);
+      strictEqual(wrongType.status, StatusCodes.UNSUPPORTED_MEDIA_TYPE);
       await wrongType.text();
 
       const tooLarge = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body: ' '.repeat(oversizedLength) });
 
-      strictEqual(tooLarge.status, payloadTooLarge);
+      strictEqual(tooLarge.status, StatusCodes.REQUEST_TOO_LONG);
       await tooLarge.text();
     });
 
     await context.test('requires POST and accepts JSON with charset', async () => {
       const wrongMethod = await fetch(url);
 
-      strictEqual(wrongMethod.status, methodNotAllowed);
+      strictEqual(wrongMethod.status, StatusCodes.METHOD_NOT_ALLOWED);
       strictEqual(wrongMethod.headers.get('allow'), 'POST');
       await wrongMethod.text();
 
       const response = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json; charset=utf-8']], body: JSON.stringify({ answers }) });
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       await response.text();
     });
 
@@ -138,7 +133,7 @@ void it('matches a complete submission without storing user answers', async (con
 
       const response = await post({ answers });
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), { totalAnswers: 3, matches: [] });
     });
 
@@ -147,7 +142,7 @@ void it('matches a complete submission without storing user answers', async (con
 
       const response = await post({ answers });
 
-      strictEqual(response.status, badRequest);
+      strictEqual(response.status, StatusCodes.BAD_REQUEST);
       await response.text();
     });
 
@@ -157,7 +152,7 @@ void it('matches a complete submission without storing user answers', async (con
 
       const response = await post({ answers });
 
-      strictEqual(response.status, internalServerError);
+      strictEqual(response.status, StatusCodes.INTERNAL_SERVER_ERROR);
       deepStrictEqual(await response.json(), { error: 'De overeenkomst met partijen kon niet worden berekend.' });
     });
   }

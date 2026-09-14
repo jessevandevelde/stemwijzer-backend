@@ -1,15 +1,14 @@
+import { StatusCodes } from 'http-status-codes';
 import type { IncomingMessage } from 'node:http';
 import { RequestError } from './request-error';
 
-const payloadTooLarge = 413;
-const unsupportedMediaType = 415;
 const maximumBodyBytes = 65536;
 
 export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   if (request.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
     request.resume();
 
-    throw new RequestError('Gebruik Content-Type: application/json.', unsupportedMediaType);
+    throw new RequestError('Gebruik Content-Type: application/json.', StatusCodes.UNSUPPORTED_MEDIA_TYPE);
   }
 
   return new Promise((resolve, reject) => {
@@ -23,7 +22,7 @@ export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
         chunks.length = 0;
         request.removeListener('data', onData);
         request.resume();
-        reject(new RequestError('De aanvraag mag maximaal 64 KiB groot zijn.', payloadTooLarge));
+        reject(new RequestError('De aanvraag mag maximaal 64 KiB groot zijn.', StatusCodes.REQUEST_TOO_LONG));
 
         return;
       }

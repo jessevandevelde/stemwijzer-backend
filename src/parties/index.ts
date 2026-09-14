@@ -1,3 +1,4 @@
+import { StatusCodes } from 'http-status-codes';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 import { readJsonBody } from '../http/read-json-body';
@@ -9,19 +10,12 @@ import { updateParty } from './update-party';
 import { deleteParty } from './delete-party';
 import { validateParty, validateUpdateParty } from './validation';
 
-const ok = 200;
-const created = 201;
-const noContent = 204;
-const notFound = 404;
-const conflict = 409;
-const internalServerError = 500;
-
 function isForeignKeyViolation(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ERR_SQLITE_ERROR' && error.message.includes('FOREIGN KEY constraint failed');
 }
 
 function writePartyNotFound(response: ServerResponse): void {
-  response.writeHead(notFound);
+  response.writeHead(StatusCodes.NOT_FOUND);
   response.end(JSON.stringify({ error: 'Geen partij gevonden met dit id.' }));
 }
 
@@ -31,7 +25,7 @@ export async function handleCreatePartyRequest(database: DatabaseSync, request: 
     const input = validateParty(body);
     const party = createParty(database, input);
 
-    response.writeHead(created);
+    response.writeHead(StatusCodes.CREATED);
     response.end(JSON.stringify(party));
   }
   catch (error: unknown) {
@@ -47,7 +41,7 @@ export async function handleCreatePartyRequest(database: DatabaseSync, request: 
     }
 
     console.error('Partij aanmaken mislukt:', error);
-    response.writeHead(internalServerError);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
     response.end(JSON.stringify({ error: 'De partij kon niet worden aangemaakt.' }));
   }
 }
@@ -56,12 +50,12 @@ export function handleListPartiesRequest(database: DatabaseSync, response: Serve
   try {
     const parties = listParties(database);
 
-    response.writeHead(ok);
+    response.writeHead(StatusCodes.OK);
     response.end(JSON.stringify(parties));
   }
   catch (error: unknown) {
     console.error('Partijen ophalen mislukt:', error);
-    response.writeHead(internalServerError);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
     response.end(JSON.stringify({ error: 'De partijen konden niet worden opgehaald.' }));
   }
 }
@@ -76,12 +70,12 @@ export function handleGetPartyByIdRequest(database: DatabaseSync, id: number, re
       return;
     }
 
-    response.writeHead(ok);
+    response.writeHead(StatusCodes.OK);
     response.end(JSON.stringify(party));
   }
   catch (error: unknown) {
     console.error('Partij ophalen mislukt:', error);
-    response.writeHead(internalServerError);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
     response.end(JSON.stringify({ error: 'De partij kon niet worden opgehaald.' }));
   }
 }
@@ -98,7 +92,7 @@ export async function handleUpdatePartyRequest(database: DatabaseSync, id: numbe
       return;
     }
 
-    response.writeHead(ok);
+    response.writeHead(StatusCodes.OK);
     response.end(JSON.stringify(getPartyById(database, id)));
   }
   catch (error: unknown) {
@@ -114,7 +108,7 @@ export async function handleUpdatePartyRequest(database: DatabaseSync, id: numbe
     }
 
     console.error('Partij wijzigen mislukt:', error);
-    response.writeHead(internalServerError);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
     response.end(JSON.stringify({ error: 'De partij kon niet worden gewijzigd.' }));
   }
 }
@@ -129,19 +123,19 @@ export function handleDeletePartyRequest(database: DatabaseSync, id: number, res
       return;
     }
 
-    response.writeHead(noContent);
+    response.writeHead(StatusCodes.NO_CONTENT);
     response.end();
   }
   catch (error: unknown) {
     if (isForeignKeyViolation(error)) {
-      response.writeHead(conflict);
+      response.writeHead(StatusCodes.CONFLICT);
       response.end(JSON.stringify({ error: 'Deze partij heeft nog partijantwoorden en kan niet worden verwijderd.' }));
 
       return;
     }
 
     console.error('Partij verwijderen mislukt:', error);
-    response.writeHead(internalServerError);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
     response.end(JSON.stringify({ error: 'De partij kon niet worden verwijderd.' }));
   }
 }

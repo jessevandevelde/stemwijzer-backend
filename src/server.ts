@@ -1,3 +1,4 @@
+import { StatusCodes } from 'http-status-codes';
 import type { Server } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 import { createServer } from 'node:http';
@@ -19,11 +20,6 @@ import {
 } from './parties';
 import { parseId } from './http/parse-id';
 
-const notFound = 404;
-const methodNotAllowed = 405;
-const badRequest = 400;
-const internalServerError = 500;
-
 const statementIdPattern = /^\/statements\/([^/]+)$/u;
 const partyIdPattern = /^\/parties\/([^/]+)$/u;
 
@@ -37,7 +33,7 @@ export function createApp(database: DatabaseSync): Server {
 
       if (url.pathname === '/matching') {
         if (method !== 'POST') {
-          response.writeHead(methodNotAllowed, { allow: 'POST' });
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'POST' });
           response.end(JSON.stringify({ error: 'Gebruik POST voor deze route.' }));
 
           return;
@@ -61,7 +57,7 @@ export function createApp(database: DatabaseSync): Server {
           return;
         }
 
-        response.writeHead(methodNotAllowed, { allow: 'GET, POST' });
+        response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, POST' });
         response.end(JSON.stringify({ error: 'Gebruik GET of POST voor deze route.' }));
 
         return;
@@ -69,7 +65,7 @@ export function createApp(database: DatabaseSync): Server {
 
       if (url.pathname === '/statements/all') {
         if (method !== 'GET') {
-          response.writeHead(methodNotAllowed, { allow: 'GET' });
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET' });
           response.end(JSON.stringify({ error: 'Gebruik GET voor deze route.' }));
 
           return;
@@ -86,7 +82,7 @@ export function createApp(database: DatabaseSync): Server {
         const id = parseId(statementIdMatch[1]);
 
         if (id === undefined) {
-          response.writeHead(badRequest);
+          response.writeHead(StatusCodes.BAD_REQUEST);
           response.end(JSON.stringify({ error: 'Het id in de URL moet een positief geheel getal zijn.' }));
 
           return;
@@ -110,7 +106,7 @@ export function createApp(database: DatabaseSync): Server {
           return;
         }
 
-        response.writeHead(methodNotAllowed, { allow: 'GET, PATCH, DELETE' });
+        response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, PATCH, DELETE' });
         response.end(JSON.stringify({ error: 'Gebruik GET, PATCH of DELETE voor deze route.' }));
 
         return;
@@ -129,7 +125,7 @@ export function createApp(database: DatabaseSync): Server {
           return;
         }
 
-        response.writeHead(methodNotAllowed, { allow: 'GET, POST' });
+        response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, POST' });
         response.end(JSON.stringify({ error: 'Gebruik GET of POST voor deze route.' }));
 
         return;
@@ -141,7 +137,7 @@ export function createApp(database: DatabaseSync): Server {
         const id = parseId(partyIdMatch[1]);
 
         if (id === undefined) {
-          response.writeHead(badRequest);
+          response.writeHead(StatusCodes.BAD_REQUEST);
           response.end(JSON.stringify({ error: 'Het id in de URL moet een positief geheel getal zijn.' }));
 
           return;
@@ -165,18 +161,18 @@ export function createApp(database: DatabaseSync): Server {
           return;
         }
 
-        response.writeHead(methodNotAllowed, { allow: 'GET, PATCH, DELETE' });
+        response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, PATCH, DELETE' });
         response.end(JSON.stringify({ error: 'Gebruik GET, PATCH of DELETE voor deze route.' }));
 
         return;
       }
 
-      response.writeHead(notFound);
+      response.writeHead(StatusCodes.NOT_FOUND);
       response.end(JSON.stringify({ error: 'Route niet gevonden.' }));
     }
     catch (error: unknown) {
       console.error('Aanvraag verwerken mislukt:', error);
-      response.writeHead(internalServerError);
+      response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
       response.end(JSON.stringify({ error: 'De aanvraag kon niet worden verwerkt.' }));
     }
   });

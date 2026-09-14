@@ -1,17 +1,10 @@
+import { StatusCodes } from 'http-status-codes';
 import { deepStrictEqual, strictEqual, notStrictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
 import { openDatabase } from '../database';
 import { createApp } from '../server';
 
-const ok = 200;
-const created = 201;
-const noContent = 204;
-const badRequest = 400;
-const notFound = 404;
-const methodNotAllowed = 405;
-const conflict = 409;
-const internalServerError = 500;
 const nonExistentId = 999;
 
 void it('serves statements and party answers over HTTP', async (context) => {
@@ -52,7 +45,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
     await context.test('returns one statement with the latest answer for each active party', async () => {
       const response = await fetch(`${baseUrl}/statements?index=0`);
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       strictEqual(response.headers.get('content-type'), 'application/json; charset=utf-8');
       deepStrictEqual(await response.json(), {
         index: 0,
@@ -70,7 +63,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
     await context.test('uses the position among active statements, not the database ID', async () => {
       const response = await fetch(`${baseUrl}/statements?index=1`);
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), {
         index: 1,
         id: 30,
@@ -88,7 +81,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
       for (const query of ['', '?index=', '?index=-1', '?index=1.5', '?index=abc', '?index=1e1', '?index=%20', '?index=0&index=1', '?index=9007199254740992', '?index=0%20OR%201=1']) {
         const response = await fetch(`${baseUrl}/statements${query}`);
 
-        strictEqual(response.status, badRequest, query);
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, query);
         await response.text();
       }
     });
@@ -97,7 +90,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
       for (const path of ['/statements?index=2', '/unknown']) {
         const response = await fetch(`${baseUrl}${path}`);
 
-        strictEqual(response.status, notFound);
+        strictEqual(response.status, StatusCodes.NOT_FOUND);
         await response.text();
       }
     });
@@ -105,7 +98,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
     await context.test('only allows GET and POST requests on /statements', async () => {
       const response = await fetch(`${baseUrl}/statements?index=0`, { method: 'PUT' });
 
-      strictEqual(response.status, methodNotAllowed);
+      strictEqual(response.status, StatusCodes.METHOD_NOT_ALLOWED);
       strictEqual(response.headers.get('allow'), 'GET, POST');
       await response.text();
     });
@@ -123,7 +116,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
 
       const response = await fetch(`${baseUrl}/statements?index=0`);
 
-      strictEqual(response.status, notFound);
+      strictEqual(response.status, StatusCodes.NOT_FOUND);
       await response.text();
     });
 
@@ -133,7 +126,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
 
       const response = await fetch(`${baseUrl}/statements?index=0`);
 
-      strictEqual(response.status, internalServerError);
+      strictEqual(response.status, StatusCodes.INTERNAL_SERVER_ERROR);
       deepStrictEqual(await response.json(), { error: 'De stelling kon niet worden opgehaald.' });
     });
   }
@@ -190,7 +183,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
         throw new Error('Expected a statement and a technical superadmin to exist.');
       }
 
-      strictEqual(response.status, created);
+      strictEqual(response.status, StatusCodes.CREATED);
       deepStrictEqual(await response.json(), {
         id: 1, text: 'Nieuwe stelling', isActive: true,
         createdAt: row['created_at'], updatedAt: row['updated_at'],
@@ -199,7 +192,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       const secondResponse = await post({ text: 'Tweede stelling', isActive: false });
       const adminCount = database.prepare('SELECT COUNT(*) AS count FROM superadmins').get();
 
-      strictEqual(secondResponse.status, created);
+      strictEqual(secondResponse.status, StatusCodes.CREATED);
 
       if (adminCount === undefined) {
         throw new Error('Expected the superadmin count to be returned.');
@@ -214,7 +207,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       for (const body of [null, [], 'text', {}, { text: '' }, { text: '  ' }, { text: 'x\0y' }, { text: 'Valid', isActive: 'yes' }, { text: 'Valid', id: 1 }]) {
         const response = await post(body);
 
-        strictEqual(response.status, badRequest, JSON.stringify(body));
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
         await response.text();
       }
 
@@ -225,7 +218,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       const response = await fetch(`${baseUrl}/all`);
       const rows = database.prepare('SELECT * FROM statements ORDER BY id').all();
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), rows.map(row => ({
         id: row['id'], text: row['text'], isActive: row['is_active'] === 1,
         createdAt: row['created_at'], updatedAt: row['updated_at'],
@@ -235,7 +228,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
     await context.test('only allows GET on /statements/all', async () => {
       const response = await fetch(`${baseUrl}/all`, { method: 'POST' });
 
-      strictEqual(response.status, methodNotAllowed);
+      strictEqual(response.status, StatusCodes.METHOD_NOT_ALLOWED);
       strictEqual(response.headers.get('allow'), 'GET');
       await response.text();
     });
@@ -248,7 +241,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
         throw new Error('Expected the statement to exist.');
       }
 
-      strictEqual(found.status, ok);
+      strictEqual(found.status, StatusCodes.OK);
       deepStrictEqual(await found.json(), {
         id: 1, text: 'Nieuwe stelling', isActive: true,
         createdAt: row['created_at'], updatedAt: row['updated_at'],
@@ -256,14 +249,14 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
 
       const missing = await fetch(`${baseUrl}/${String(nonExistentId)}`);
 
-      strictEqual(missing.status, notFound);
+      strictEqual(missing.status, StatusCodes.NOT_FOUND);
       await missing.text();
     });
 
     await context.test('rejects an invalid id in the URL', async () => {
       const response = await fetch(`${baseUrl}/not-a-number`);
 
-      strictEqual(response.status, badRequest);
+      strictEqual(response.status, StatusCodes.BAD_REQUEST);
       await response.text();
     });
 
@@ -278,7 +271,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
         throw new Error('Expected the statement row to exist.');
       }
 
-      strictEqual(response.status, ok);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), {
         id: 1, text: 'Gewijzigde stelling', isActive: false,
         createdAt: after['created_at'], updatedAt: after['updated_at'],
@@ -293,7 +286,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       for (const body of [{}, { text: '' }, { isActive: 'no' }, { id: 5 }, { unknown: 'field' }]) {
         const response = await patch(1, body);
 
-        strictEqual(response.status, badRequest, JSON.stringify(body));
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
         await response.text();
       }
 
@@ -303,14 +296,14 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
     await context.test('returns 404 when updating a statement that does not exist', async () => {
       const response = await patch(nonExistentId, { text: 'Nieuw' });
 
-      strictEqual(response.status, notFound);
+      strictEqual(response.status, StatusCodes.NOT_FOUND);
       await response.text();
     });
 
     await context.test('only allows GET, PATCH and DELETE on a statement by id', async () => {
       const response = await fetch(`${baseUrl}/1`, { method: 'POST' });
 
-      strictEqual(response.status, methodNotAllowed);
+      strictEqual(response.status, StatusCodes.METHOD_NOT_ALLOWED);
       strictEqual(response.headers.get('allow'), 'GET, PATCH, DELETE');
       await response.text();
     });
@@ -323,7 +316,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
 
       const response = await fetch(`${baseUrl}/1`, { method: 'DELETE' });
 
-      strictEqual(response.status, conflict);
+      strictEqual(response.status, StatusCodes.CONFLICT);
       await response.text();
       notStrictEqual(database.prepare('SELECT 1 FROM statements WHERE id = 1').get(), undefined);
     });
@@ -331,16 +324,16 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
     await context.test('deletes a statement without references and returns 404 afterwards', async () => {
       const response = await fetch(`${baseUrl}/2`, { method: 'DELETE' });
 
-      strictEqual(response.status, noContent);
+      strictEqual(response.status, StatusCodes.NO_CONTENT);
 
       const gone = await fetch(`${baseUrl}/2`);
 
-      strictEqual(gone.status, notFound);
+      strictEqual(gone.status, StatusCodes.NOT_FOUND);
       await gone.text();
 
       const secondDelete = await fetch(`${baseUrl}/2`, { method: 'DELETE' });
 
-      strictEqual(secondDelete.status, notFound);
+      strictEqual(secondDelete.status, StatusCodes.NOT_FOUND);
       await secondDelete.text();
     });
   }

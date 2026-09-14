@@ -1,19 +1,10 @@
+import { StatusCodes } from 'http-status-codes';
 import { deepStrictEqual, strictEqual, ok } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
 import { openDatabase } from '../database';
 import { createApp } from '../server';
 
-const success = 200;
-const created = 201;
-const noContent = 204;
-const badRequest = 400;
-const notFound = 404;
-const methodNotAllowed = 405;
-const conflict = 409;
-const payloadTooLarge = 413;
-const unsupportedMediaType = 415;
-const internalServerError = 500;
 const maximumNameLength = 100;
 const maximumUrlLength = 255;
 const oversizedLength = 65537;
@@ -43,7 +34,7 @@ void it('creates parties over HTTP', async (context) => {
       const response = await post({ name: '  Nieuwe partij  ' });
       const row = database.prepare('SELECT * FROM parties WHERE id = 1').get();
 
-      strictEqual(response.status, created);
+      strictEqual(response.status, StatusCodes.CREATED);
       strictEqual(response.headers.get('content-type'), 'application/json; charset=utf-8');
       ok(row);
       strictEqual(typeof row['created_at'], 'string');
@@ -59,7 +50,7 @@ void it('creates parties over HTTP', async (context) => {
       const response = await post(input);
       const row = database.prepare('SELECT * FROM parties WHERE name = ?').get(input.name);
 
-      strictEqual(response.status, created);
+      strictEqual(response.status, StatusCodes.CREATED);
       ok(row);
       strictEqual(row['description'], input.description);
       strictEqual(row['image_url'], input.imageUrl);
@@ -77,7 +68,7 @@ void it('creates parties over HTTP', async (context) => {
       ]) {
         const response = await post(input);
 
-        strictEqual(response.status, created);
+        strictEqual(response.status, StatusCodes.CREATED);
         await response.text();
       }
     });
@@ -99,7 +90,7 @@ void it('creates parties over HTTP', async (context) => {
       for (const input of invalidBodies) {
         const response = await post(input);
 
-        strictEqual(response.status, badRequest, JSON.stringify(input));
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(input));
         await response.text();
       }
 
@@ -112,23 +103,23 @@ void it('creates parties over HTTP', async (context) => {
       for (const body of ['', '{']) {
         const response = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body });
 
-        strictEqual(response.status, badRequest);
+        strictEqual(response.status, StatusCodes.BAD_REQUEST);
         await response.text();
       }
 
       const wrongType = await fetch(url, { method: 'POST', body: '{}' });
 
-      strictEqual(wrongType.status, unsupportedMediaType);
+      strictEqual(wrongType.status, StatusCodes.UNSUPPORTED_MEDIA_TYPE);
       await wrongType.text();
 
       const tooLarge = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body: ' '.repeat(oversizedLength) });
 
-      strictEqual(tooLarge.status, payloadTooLarge);
+      strictEqual(tooLarge.status, StatusCodes.REQUEST_TOO_LONG);
       await tooLarge.text();
 
       const wrongMethod = await fetch(url, { method: 'PUT' });
 
-      strictEqual(wrongMethod.status, methodNotAllowed);
+      strictEqual(wrongMethod.status, StatusCodes.METHOD_NOT_ALLOWED);
       strictEqual(wrongMethod.headers.get('allow'), 'GET, POST');
       await wrongMethod.text();
       deepStrictEqual(database.prepare('SELECT COUNT(*) AS count FROM parties').get(), before);
@@ -140,7 +131,7 @@ void it('creates parties over HTTP', async (context) => {
 
       const response = await post({ name: 'Valid' });
 
-      strictEqual(response.status, internalServerError);
+      strictEqual(response.status, StatusCodes.INTERNAL_SERVER_ERROR);
       deepStrictEqual(await response.json(), { error: 'De partij kon niet worden aangemaakt.' });
     });
   }
@@ -187,7 +178,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
     await context.test('returns an empty list when there are no parties', async () => {
       const response = await fetch(baseUrl);
 
-      strictEqual(response.status, success);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), []);
     });
 
@@ -201,7 +192,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
       const response = await fetch(baseUrl);
       const rows = database.prepare('SELECT * FROM parties ORDER BY id').all();
 
-      strictEqual(response.status, success);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), [
         { id: 1, name: 'Partij A', description: 'Beschrijving A', imageUrl: 'https://example.test/a.png', isActive: true, createdAt: rows[0]['created_at'], updatedAt: rows[0]['updated_at'] },
         { id: 2, name: 'Partij B', description: null, imageUrl: null, isActive: false, createdAt: rows[1]['created_at'], updatedAt: rows[1]['updated_at'] },
@@ -212,20 +203,20 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
       const found = await fetch(`${baseUrl}/1`);
       const body: unknown = await found.json();
 
-      strictEqual(found.status, success);
+      strictEqual(found.status, StatusCodes.OK);
       ok(typeof body === 'object' && body !== null && 'name' in body);
       strictEqual(body.name, 'Partij A');
 
       const missing = await fetch(`${baseUrl}/${String(nonExistentId)}`);
 
-      strictEqual(missing.status, notFound);
+      strictEqual(missing.status, StatusCodes.NOT_FOUND);
       await missing.text();
     });
 
     await context.test('rejects an invalid id in the URL', async () => {
       const response = await fetch(`${baseUrl}/not-a-number`);
 
-      strictEqual(response.status, badRequest);
+      strictEqual(response.status, StatusCodes.BAD_REQUEST);
       await response.text();
     });
 
@@ -240,7 +231,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
       const after = database.prepare('SELECT * FROM parties WHERE id = 1').get();
 
       ok(after);
-      strictEqual(response.status, success);
+      strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), {
         id: 1, name: 'Partij A', description: 'Beschrijving A', imageUrl: 'https://example.test/a.png',
         isActive: false, createdAt: after['created_at'], updatedAt: after['updated_at'],
@@ -255,7 +246,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
       for (const body of [{}, { name: '' }, { isActive: 'no' }, { id: 5 }, { unknown: 'field' }]) {
         const response = await patch(1, body);
 
-        strictEqual(response.status, badRequest, JSON.stringify(body));
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
         await response.text();
       }
 
@@ -265,14 +256,14 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
     await context.test('returns 404 when updating a party that does not exist', async () => {
       const response = await patch(nonExistentId, { name: 'Nieuw' });
 
-      strictEqual(response.status, notFound);
+      strictEqual(response.status, StatusCodes.NOT_FOUND);
       await response.text();
     });
 
     await context.test('only allows GET, PATCH and DELETE on a party by id', async () => {
       const response = await fetch(`${baseUrl}/1`, { method: 'POST' });
 
-      strictEqual(response.status, methodNotAllowed);
+      strictEqual(response.status, StatusCodes.METHOD_NOT_ALLOWED);
       strictEqual(response.headers.get('allow'), 'GET, PATCH, DELETE');
       await response.text();
     });
@@ -286,7 +277,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
 
       const response = await fetch(`${baseUrl}/2`, { method: 'DELETE' });
 
-      strictEqual(response.status, conflict);
+      strictEqual(response.status, StatusCodes.CONFLICT);
       await response.text();
       ok(database.prepare('SELECT 1 FROM parties WHERE id = 2').get());
     });
@@ -294,16 +285,16 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
     await context.test('deletes a party without references and returns 404 afterwards', async () => {
       const response = await fetch(`${baseUrl}/1`, { method: 'DELETE' });
 
-      strictEqual(response.status, noContent);
+      strictEqual(response.status, StatusCodes.NO_CONTENT);
 
       const gone = await fetch(`${baseUrl}/1`);
 
-      strictEqual(gone.status, notFound);
+      strictEqual(gone.status, StatusCodes.NOT_FOUND);
       await gone.text();
 
       const secondDelete = await fetch(`${baseUrl}/1`, { method: 'DELETE' });
 
-      strictEqual(secondDelete.status, notFound);
+      strictEqual(secondDelete.status, StatusCodes.NOT_FOUND);
       await secondDelete.text();
     });
   }
