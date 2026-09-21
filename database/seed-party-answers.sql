@@ -1281,4 +1281,31 @@ AND NOT EXISTS (
   WHERE party_answers.party_id = parties.id AND party_answers.statement_id = statements.id
 );
 
+-- Vul voor iedere actieve testpartij de nog ontbrekende standpunten aan. De
+-- handmatig gekozen voorbeelden hierboven blijven leidend; alleen gaten worden
+-- deterministisch gevuld zodat elke partij met alle actieve stellingen kan
+-- worden vergeleken.
+INSERT INTO party_answers (party_id, statement_id, answer)
+SELECT parties.id, statements.id,
+  CASE (parties.id + statements.id) % 3
+    WHEN 0 THEN 'eens'
+    WHEN 1 THEN 'neutraal'
+    ELSE 'oneens'
+  END
+FROM parties
+CROSS JOIN statements
+WHERE parties.name IN (
+  'Partij voor Vooruitgang',
+  'Groene Toekomst Alliantie',
+  'Liberaal Perspectief',
+  'Sociale Verbinding',
+  'Nationaal Behoud'
+)
+AND parties.is_active = 1
+AND statements.is_active = 1
+AND NOT EXISTS (
+  SELECT 1 FROM party_answers
+  WHERE party_answers.party_id = parties.id AND party_answers.statement_id = statements.id
+);
+
 COMMIT;
