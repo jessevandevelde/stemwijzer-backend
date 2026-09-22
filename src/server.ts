@@ -11,6 +11,7 @@ import {
   handleDeleteStatementRequest,
 } from './statements';
 import { handleMatchingRequest } from './matching';
+import { handleLoginRequest } from './auth';
 import {
   handleCreatePartyRequest,
   handleListPartiesRequest,
@@ -30,6 +31,19 @@ export function createApp(database: DatabaseSync): Server {
     try {
       const url = new URL(request.url ?? '/', 'http://localhost');
       const method = request.method ?? '';
+
+      if (url.pathname === '/auth/login') {
+        if (method !== 'POST') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'POST' });
+          response.end(JSON.stringify({ error: 'Gebruik POST voor deze route.' }));
+
+          return;
+        }
+
+        void handleLoginRequest(database, request, response);
+
+        return;
+      }
 
       if (url.pathname === '/matching') {
         if (method !== 'POST') {
