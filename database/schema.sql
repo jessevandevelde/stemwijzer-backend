@@ -11,13 +11,16 @@ CREATE TABLE IF NOT EXISTS superadmins (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- economic_weight: -1 (links) .. 1 (rechts); cultural_weight: -1 (progressief) .. 1 (conservatief); 0 = raakt die as niet.
 CREATE TABLE IF NOT EXISTS statements (
     id INTEGER PRIMARY KEY,
     text TEXT NOT NULL,
     created_by INTEGER NOT NULL REFERENCES superadmins(id),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+    is_active BOOLEAN NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    economic_weight REAL NOT NULL DEFAULT 0 CHECK (economic_weight BETWEEN -1 AND 1),
+    cultural_weight REAL NOT NULL DEFAULT 0 CHECK (cultural_weight BETWEEN -1 AND 1)
 );
 
 CREATE TABLE IF NOT EXISTS parties (
@@ -50,7 +53,7 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS statements_updated_at
-AFTER UPDATE OF text, created_by, is_active ON statements
+AFTER UPDATE OF text, created_by, is_active, economic_weight, cultural_weight ON statements
 BEGIN
     UPDATE statements SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;

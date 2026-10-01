@@ -157,5 +157,38 @@ SELECT 'De overheid moet gezichtsherkenning mogen gebruiken om ernstige criminal
 WHERE email = 'statements-import@stemwijzer.invalid'
 AND NOT EXISTS (SELECT 1 FROM statements WHERE text = 'De overheid moet gezichtsherkenning mogen gebruiken om ernstige criminaliteit te bestrijden.');
 
+-- Classificatie voor het links/rechts- en progressief/conservatief-spectrum.
+-- economic_weight: -1 = links, 1 = rechts. cultural_weight: -1 = progressief, 1 = conservatief. 0 = raakt die as niet.
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'De overheid moet meer geld investeren in betaalbare woningen.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 1 WHERE text = 'Nederland moet strengere regels invoeren voor immigratie.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'Het minimumloon moet verder worden verhoogd.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'De belastingen voor hoge inkomens moeten omhoog.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 1 WHERE text = 'Nederland moet meer geld uitgeven aan defensie.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 0.5 WHERE text = 'Kernenergie moet een belangrijk onderdeel worden van de Nederlandse energievoorziening.';
+UPDATE statements SET economic_weight = 0, cultural_weight = -1 WHERE text = 'De overheid moet sneller stoppen met het gebruik van fossiele brandstoffen.';
+UPDATE statements SET economic_weight = -0.5, cultural_weight = -1 WHERE text = 'Boeren moeten strengere milieuregels krijgen om stikstofuitstoot te verminderen.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'Het openbaar vervoer moet goedkoper worden.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'Studenten moeten meer financiële ondersteuning krijgen van de overheid.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'De overheid moet meer geld investeren in de zorg.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'Het eigen risico in de zorg moet worden afgeschaft.';
+UPDATE statements SET economic_weight = 0, cultural_weight = -1 WHERE text = 'Nederland moet meer vluchtelingen opvangen.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 1 WHERE text = 'De politie moet meer bevoegdheden krijgen om criminaliteit te bestrijden.';
+UPDATE statements SET economic_weight = 0, cultural_weight = -1 WHERE text = 'Cannabis moet volledig worden gelegaliseerd.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 1 WHERE text = 'De maximumsnelheid op snelwegen moet overdag weer naar 130 km/u.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'Bedrijven moeten meer belasting betalen.';
+UPDATE statements SET economic_weight = 0, cultural_weight = -1 WHERE text = 'Nederland moet meer bevoegdheden overdragen aan de Europese Unie.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 0 WHERE text = 'Er moet een bindend referendum komen waarmee burgers direct over wetten kunnen stemmen.';
+UPDATE statements SET economic_weight = -0.5, cultural_weight = -1 WHERE text = 'De overheid moet harder optreden tegen bedrijven die veel CO₂ uitstoten.';
+UPDATE statements SET economic_weight = 0, cultural_weight = -1 WHERE text = 'Vlees moet duurder worden om milieuschade te verminderen.';
+UPDATE statements SET economic_weight = -1, cultural_weight = 0 WHERE text = 'De overheid moet gratis kinderopvang aanbieden.';
+UPDATE statements SET economic_weight = -0.5, cultural_weight = 0 WHERE text = 'Er moet meer geld naar onderwijs, ook als daarvoor andere overheidsuitgaven moeten worden verlaagd.';
+UPDATE statements SET economic_weight = -0.5, cultural_weight = 0 WHERE text = 'Sociale media moeten strenger worden gereguleerd.';
+UPDATE statements SET economic_weight = 0, cultural_weight = -1 WHERE text = 'Nederland moet de verkoop van nieuwe benzine- en dieselauto’s sneller verbieden.';
+UPDATE statements SET economic_weight = 1, cultural_weight = 0.5 WHERE text = 'Mensen met een uitkering moeten verplicht worden om passend werk te accepteren.';
+UPDATE statements SET economic_weight = -0.5, cultural_weight = -1 WHERE text = 'De overheid moet meer geld besteden aan ontwikkelingshulp.';
+UPDATE statements SET economic_weight = 1, cultural_weight = 0 WHERE text = 'De inkomstenbelasting moet omlaag.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 1 WHERE text = 'Nederland moet minder afhankelijk worden van andere landen voor energie en grondstoffen.';
+UPDATE statements SET economic_weight = 0, cultural_weight = 1 WHERE text = 'De overheid moet gezichtsherkenning mogen gebruiken om ernstige criminaliteit te bestrijden.';
+
 COMMIT;
 
