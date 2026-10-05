@@ -7,6 +7,15 @@ import { createApp } from '../server';
 
 const oversizedLength = 65537;
 
+interface SpectrumResultBody {
+  readonly matches: readonly { readonly partyId: number, readonly economicPosition: number, readonly culturalPosition: number }[]
+  readonly userPosition: { readonly economicPosition: number, readonly culturalPosition: number }
+}
+
+function isSpectrumResultBody(value: unknown): value is SpectrumResultBody {
+  return typeof value === 'object' && value !== null && 'matches' in value && Array.isArray(value.matches) && 'userPosition' in value;
+}
+
 void it('matches a complete submission without storing user answers', async (context) => {
   const database = openDatabase(':memory:');
   const server = createApp(database);
@@ -60,15 +69,46 @@ void it('matches a complete submission without storing user answers', async (con
       deepStrictEqual(await response.json(), {
         totalAnswers: 3,
         matches: [
-          { partyId: 1, partyName: 'Alles gelijk', matchPercentage: 100, matchedAnswers: 3, comparedAnswers: 3, missingAnswers: 0 },
-          { partyId: 7, partyName: 'Gelijke score', matchPercentage: 100, matchedAnswers: 3, comparedAnswers: 3, missingAnswers: 0 },
-          { partyId: 3, partyName: 'Onvolledig', matchPercentage: 100, matchedAnswers: 1, comparedAnswers: 1, missingAnswers: 2 },
-          { partyId: 2, partyName: 'Twee gelijk', matchPercentage: 66.67, matchedAnswers: 2, comparedAnswers: 3, missingAnswers: 0 },
-          { partyId: 4, partyName: 'Niets gelijk', matchPercentage: 0, matchedAnswers: 0, comparedAnswers: 3, missingAnswers: 0 },
-          { partyId: 5, partyName: 'Geen antwoorden', matchPercentage: null, matchedAnswers: 0, comparedAnswers: 0, missingAnswers: 3 },
+          { partyId: 1, partyName: 'Alles gelijk', matchPercentage: 100, matchedAnswers: 3, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
+          { partyId: 7, partyName: 'Gelijke score', matchPercentage: 100, matchedAnswers: 3, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
+          { partyId: 3, partyName: 'Onvolledig', matchPercentage: 100, matchedAnswers: 1, comparedAnswers: 1, missingAnswers: 2, economicPosition: 0, culturalPosition: 0 },
+          { partyId: 2, partyName: 'Twee gelijk', matchPercentage: 66.67, matchedAnswers: 2, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
+          { partyId: 4, partyName: 'Niets gelijk', matchPercentage: 0, matchedAnswers: 0, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
+          { partyId: 5, partyName: 'Geen antwoorden', matchPercentage: null, matchedAnswers: 0, comparedAnswers: 0, missingAnswers: 3, economicPosition: 0, culturalPosition: 0 },
         ],
+        userPosition: { economicPosition: 0, culturalPosition: 0 },
       });
       deepStrictEqual(database.prepare('SELECT * FROM party_answers ORDER BY id').all(), snapshot);
+    });
+
+    await context.test('computes links/rechts and progressief/conservatief positions from weighted statements', async () => {
+      database.exec(`
+        UPDATE statements SET economic_weight = -1 WHERE id = 10;
+        UPDATE statements SET economic_weight = 1 WHERE id = 30;
+        UPDATE statements SET cultural_weight = 1 WHERE id = 40;
+      `);
+
+      try {
+        const response = await post({ answers });
+
+        strictEqual(response.status, StatusCodes.OK);
+
+        const body: unknown = await response.json();
+
+        if (!isSpectrumResultBody(body)) {
+          throw new Error('Expected a spectrum result body with matches and a userPosition.');
+        }
+
+        const partyOne = body.matches.find(match => match.partyId === 1);
+
+        deepStrictEqual(partyOne && { economicPosition: partyOne.economicPosition, culturalPosition: partyOne.culturalPosition }, { economicPosition: -0.5, culturalPosition: -1 });
+        deepStrictEqual(body.userPosition, { economicPosition: -0.5, culturalPosition: -1 });
+      }
+      finally {
+        database.exec(`
+          UPDATE statements SET economic_weight = 0, cultural_weight = 0 WHERE id IN (10, 30, 40);
+        `);
+      }
     });
 
     await context.test('rejects malformed, partial, duplicate, unknown and inactive submissions', async () => {
@@ -134,7 +174,7 @@ void it('matches a complete submission without storing user answers', async (con
       const response = await post({ answers });
 
       strictEqual(response.status, StatusCodes.OK);
-      deepStrictEqual(await response.json(), { totalAnswers: 3, matches: [] });
+      deepStrictEqual(await response.json(), { totalAnswers: 3, matches: [], userPosition: { economicPosition: 0, culturalPosition: 0 } });
     });
 
     await context.test('rejects a submission after statements have changed', async () => {
