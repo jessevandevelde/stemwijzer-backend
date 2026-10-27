@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { migrateDatabase } from './migrate';
 
 const projectRoot = resolve(__dirname, '../..');
 
@@ -13,6 +14,7 @@ export function openDatabase(path = process.env['DATABASE_PATH'] ?? resolve(proj
 
   try {
     database.exec(readFileSync(resolve(projectRoot, 'database/schema.sql'), 'utf8'));
+    migrateDatabase(database);
   }
   catch (error: unknown) {
     database.close();

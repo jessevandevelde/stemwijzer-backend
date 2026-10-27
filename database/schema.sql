@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS parties (
     name VARCHAR(100) NOT NULL CHECK (length(name) <= 100),
     description TEXT,
     image_url VARCHAR(255) CHECK (length(image_url) <= 255),
+    abbreviation VARCHAR(20) CHECK (length(abbreviation) <= 20),
+    color VARCHAR(7) CHECK (length(color) = 7),
+    seats INTEGER CHECK (seats BETWEEN 0 AND 150),
+    leader VARCHAR(100) CHECK (length(leader) <= 100),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
@@ -59,7 +63,7 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS parties_updated_at
-AFTER UPDATE OF name, description, image_url, is_active ON parties
+AFTER UPDATE OF name, description, image_url, abbreviation, color, seats, leader, is_active ON parties
 BEGIN
     UPDATE parties SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
