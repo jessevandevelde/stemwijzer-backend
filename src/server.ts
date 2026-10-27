@@ -19,10 +19,13 @@ import {
   handleUpdatePartyRequest,
   handleDeletePartyRequest,
 } from './parties';
+import { handleListPartyAnswersRequest, handleSetPartyAnswerRequest } from './party-answers';
 import { parseId } from './http/parse-id';
 
 const statementIdPattern = /^\/statements\/([^/]+)$/u;
 const partyIdPattern = /^\/parties\/([^/]+)$/u;
+const partyAnswersPattern = /^\/parties\/([^/]+)\/answers$/u;
+const partyAnswerPattern = /^\/parties\/([^/]+)\/answers\/([^/]+)$/u;
 
 export function createApp(database: DatabaseSync): Server {
   return createServer((request, response) => {
@@ -141,6 +144,55 @@ export function createApp(database: DatabaseSync): Server {
 
         response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, POST' });
         response.end(JSON.stringify({ error: 'Gebruik GET of POST voor deze route.' }));
+
+        return;
+      }
+
+      const partyAnswersMatch = partyAnswersPattern.exec(url.pathname);
+
+      if (partyAnswersMatch) {
+        const partyId = parseId(partyAnswersMatch[1]);
+
+        if (partyId === undefined) {
+          response.writeHead(StatusCodes.BAD_REQUEST);
+          response.end(JSON.stringify({ error: 'Het id in de URL moet een positief geheel getal zijn.' }));
+
+          return;
+        }
+
+        if (method !== 'GET') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET' });
+          response.end(JSON.stringify({ error: 'Gebruik GET voor deze route.' }));
+
+          return;
+        }
+
+        handleListPartyAnswersRequest(database, partyId, response);
+
+        return;
+      }
+
+      const partyAnswerMatch = partyAnswerPattern.exec(url.pathname);
+
+      if (partyAnswerMatch) {
+        const partyId = parseId(partyAnswerMatch[1]);
+        const statementId = parseId(partyAnswerMatch[2]);
+
+        if (partyId === undefined || statementId === undefined) {
+          response.writeHead(StatusCodes.BAD_REQUEST);
+          response.end(JSON.stringify({ error: 'De ids in de URL moeten positieve gehele getallen zijn.' }));
+
+          return;
+        }
+
+        if (method !== 'PUT') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'PUT' });
+          response.end(JSON.stringify({ error: 'Gebruik PUT voor deze route.' }));
+
+          return;
+        }
+
+        void handleSetPartyAnswerRequest(database, partyId, statementId, request, response);
 
         return;
       }
