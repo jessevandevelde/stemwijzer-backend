@@ -3,10 +3,13 @@ import type { CreatePartyInput, Party } from '../types/party.interface';
 
 export function createParty(database: DatabaseSync, input: CreatePartyInput): Party {
   const row = database.prepare(`
-    INSERT INTO parties (name, description, image_url, is_active)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO parties (name, description, image_url, abbreviation, color, seats, leader, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING id, created_at AS createdAt, updated_at AS updatedAt
-  `).get(input.name, input.description, input.imageUrl, input.isActive ? 1 : 0);
+  `).get(
+    input.name, input.description, input.imageUrl, input.abbreviation,
+    input.color, input.seats, input.leader, input.isActive ? 1 : 0,
+  );
 
   if (!row) {
     throw new Error('De database heeft geen aangemaakte partij teruggegeven.');

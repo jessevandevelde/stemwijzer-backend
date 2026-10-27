@@ -9,6 +9,8 @@ const maximumNameLength = 100;
 const maximumUrlLength = 255;
 const oversizedLength = 65537;
 const nonExistentId = 999;
+const maximumSeats = 150;
+const maximumAbbreviationLength = 20;
 
 void it('creates parties over HTTP', async (context) => {
   const database = openDatabase(':memory:');
@@ -40,13 +42,17 @@ void it('creates parties over HTTP', async (context) => {
       strictEqual(typeof row['created_at'], 'string');
       strictEqual(row['is_active'], 1);
       deepStrictEqual(await response.json(), {
-        id: 1, name: 'Nieuwe partij', description: null, imageUrl: null, isActive: true,
+        id: 1, name: 'Nieuwe partij', description: null, imageUrl: null, abbreviation: null, color: null, seats: null, leader: null, isActive: true,
         createdAt: row['created_at'], updatedAt: row['updated_at'],
       });
     });
 
     await context.test('stores optional fields and false without executing SQL in text', async () => {
-      const input = { name: 'Partij O\'Brien', description: '\'); DROP TABLE parties; --', imageUrl: 'https://example.test/logo.png', isActive: false };
+      const input = {
+        name: 'Partij O\'Brien', description: '\'); DROP TABLE parties; --', imageUrl: 'https://example.test/logo.png',
+        abbreviation: 'POB', color: '#00AA44', seats: 0, leader: 'Rob O\'Brien', isActive: false,
+      };
+
       const response = await post(input);
       const row = database.prepare('SELECT * FROM parties WHERE name = ?').get(input.name);
 
@@ -85,6 +91,10 @@ void it('creates parties over HTTP', async (context) => {
         { name: 'Valid', imageUrl: 'javascript:alert(1)' }, { name: 'Valid', imageUrl: 'ftp://example.test/logo' },
         { name: 'Valid', imageUrl: 'https://example.test/'.padEnd(maximumUrlLength + 1, 'a') },
         { name: 'Valid', id: 123 }, { name: 'Valid', answers: [] },
+        { name: 'Valid', abbreviation: 'a'.repeat(maximumAbbreviationLength + 1) }, { name: 'Valid', abbreviation: 1 },
+        { name: 'Valid', color: '00AA44' }, { name: 'Valid', color: '#00AA4' }, { name: 'Valid', color: 'red' },
+        { name: 'Valid', seats: -1 }, { name: 'Valid', seats: maximumSeats + 1 }, { name: 'Valid', seats: 1.5 }, { name: 'Valid', seats: '9' },
+        { name: 'Valid', leader: 'a'.repeat(maximumNameLength + 1) },
       ];
 
       for (const input of invalidBodies) {
@@ -194,8 +204,8 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
 
       strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), [
-        { id: 1, name: 'Partij A', description: 'Beschrijving A', imageUrl: 'https://example.test/a.png', isActive: true, createdAt: rows[0]['created_at'], updatedAt: rows[0]['updated_at'] },
-        { id: 2, name: 'Partij B', description: null, imageUrl: null, isActive: false, createdAt: rows[1]['created_at'], updatedAt: rows[1]['updated_at'] },
+        { id: 1, name: 'Partij A', description: 'Beschrijving A', imageUrl: 'https://example.test/a.png', abbreviation: null, color: null, seats: null, leader: null, isActive: true, createdAt: rows[0]['created_at'], updatedAt: rows[0]['updated_at'] },
+        { id: 2, name: 'Partij B', description: null, imageUrl: null, abbreviation: null, color: null, seats: null, leader: null, isActive: false, createdAt: rows[1]['created_at'], updatedAt: rows[1]['updated_at'] },
       ]);
     });
 
@@ -227,13 +237,14 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
 
       ok(before);
 
-      const response = await patch(1, { isActive: false });
+      const response = await patch(1, { isActive: false, abbreviation: ' PA ', color: '#aabbcc', seats: maximumSeats, leader: 'Lijsttrekker A' });
       const after = database.prepare('SELECT * FROM parties WHERE id = 1').get();
 
       ok(after);
       strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), {
         id: 1, name: 'Partij A', description: 'Beschrijving A', imageUrl: 'https://example.test/a.png',
+        abbreviation: 'PA', color: '#AABBCC', seats: maximumSeats, leader: 'Lijsttrekker A',
         isActive: false, createdAt: after['created_at'], updatedAt: after['updated_at'],
       });
       strictEqual(after['is_active'], 0);

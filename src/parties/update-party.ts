@@ -20,6 +20,26 @@ export function updateParty(database: DatabaseSync, id: number, input: UpdatePar
     values.push(input.imageUrl);
   }
 
+  if (input.abbreviation !== undefined) {
+    assignments.push('abbreviation = ?');
+    values.push(input.abbreviation);
+  }
+
+  if (input.color !== undefined) {
+    assignments.push('color = ?');
+    values.push(input.color);
+  }
+
+  if (input.seats !== undefined) {
+    assignments.push('seats = ?');
+    values.push(input.seats);
+  }
+
+  if (input.leader !== undefined) {
+    assignments.push('leader = ?');
+    values.push(input.leader);
+  }
+
   if (input.isActive !== undefined) {
     assignments.push('is_active = ?');
     values.push(input.isActive ? 1 : 0);
