@@ -21,7 +21,12 @@ import {
   handleDeletePartyRequest,
 } from './parties';
 import { handleListPartyAnswersRequest, handleSetPartyAnswerRequest } from './party-answers';
-import { handleListPartyAdminStatementsRequest, handleSetPartyAdminAnswerRequest } from './party-admin';
+import {
+  handleGetPartyAdminPartyRequest,
+  handleListPartyAdminStatementsRequest,
+  handleSetPartyAdminAnswerRequest,
+  handleUpdatePartyAdminPartyRequest,
+} from './party-admin';
 import { parseId } from './http/parse-id';
 
 const statementIdPattern = /^\/statements\/([^/]+)$/u;
@@ -246,6 +251,26 @@ export function createApp(database: DatabaseSync): Server {
 
         response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, PATCH, DELETE' });
         response.end(JSON.stringify({ error: 'Gebruik GET, PATCH of DELETE voor deze route.' }));
+
+        return;
+      }
+
+      if (url.pathname === '/party-admin/party') {
+        if (method !== 'GET' && method !== 'PATCH') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, PATCH' });
+          response.end(JSON.stringify({ error: 'Gebruik GET of PATCH voor deze route.' }));
+
+          return;
+        }
+
+        const user = authorize(database, request, response, 'party-admin');
+
+        if (user && method === 'GET') {
+          handleGetPartyAdminPartyRequest(database, user, response);
+        }
+        else if (user) {
+          void handleUpdatePartyAdminPartyRequest(database, user, request, response);
+        }
 
         return;
       }

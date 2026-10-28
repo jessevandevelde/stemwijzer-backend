@@ -11,6 +11,7 @@ const nonExistentId = 999;
 const partyCount = 2;
 const superadminId = 2;
 const tokenLength = 64;
+const updatedSeats = 12;
 
 function hasToken(value: unknown): value is { token: string, user: unknown } {
   return typeof value === 'object' && value !== null && 'token' in value && typeof value.token === 'string' && 'user' in value;
@@ -164,6 +165,61 @@ void it('lets party admins manage only the answers of their own party', async (c
       strictEqual(database.prepare('SELECT name FROM parties WHERE id = 1').get()?.['name'], 'Partij A');
       strictEqual(database.prepare('SELECT COUNT(*) AS count FROM parties').get()?.['count'], partyCount);
       strictEqual(database.prepare('SELECT answer FROM party_answers WHERE party_id = 2 AND statement_id = 1').get()?.['answer'], 'eens');
+    });
+
+    await context.test('lets a party admin edit the details of the own party, except whether it is active', async () => {
+      const read = await request('GET', '/party-admin/party', partyAdmin.token);
+      const readBody: unknown = await read.json();
+
+      strictEqual(read.status, StatusCodes.OK);
+      strictEqual(typeof readBody === 'object' && readBody !== null && 'name' in readBody ? readBody.name : undefined, 'Partij A');
+
+      const updated = await request('PATCH', '/party-admin/party', partyAdmin.token, {
+        name: '  Partij A Nieuw  ', description: 'Nieuwe omschrijving', abbreviation: 'PAN', color: '#aabbcc',
+        seats: updatedSeats, leader: 'Lijsttrekker A', imageUrl: 'https://example.test/logo.png',
+      });
+
+      const updatedBody: unknown = await updated.json();
+
+      strictEqual(updated.status, StatusCodes.OK);
+      strictEqual(typeof updatedBody === 'object' && updatedBody !== null && 'name' in updatedBody ? updatedBody.name : undefined, 'Partij A Nieuw');
+      deepStrictEqual(
+        { ...database.prepare('SELECT name, description, abbreviation, color, seats, leader, image_url AS imageUrl, is_active AS isActive FROM parties WHERE id = 1').get() },
+        {
+          name: 'Partij A Nieuw', description: 'Nieuwe omschrijving', abbreviation: 'PAN', color: '#AABBCC',
+          seats: updatedSeats, leader: 'Lijsttrekker A', imageUrl: 'https://example.test/logo.png', isActive: 1,
+        },
+      );
+      strictEqual(database.prepare('SELECT name FROM parties WHERE id = 2').get()?.['name'], 'Partij B');
+
+      const statements = await request('GET', '/party-admin/statements', partyAdmin.token);
+      const statementsBody: unknown = await statements.json();
+
+      deepStrictEqual(typeof statementsBody === 'object' && statementsBody !== null && 'party' in statementsBody ? statementsBody.party : undefined, { id: 1, name: 'Partij A Nieuw' });
+
+      for (const body of [{}, { name: '' }, { color: 'rood' }, { seats: -1 }, { name: 'X', id: 2 }, { description: 'x\0y' }, []]) {
+        const response = await request('PATCH', '/party-admin/party', partyAdmin.token, body);
+
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
+        await response.text();
+      }
+
+      const cases: [Promise<Response>, number][] = [
+        [request('PATCH', '/party-admin/party', null, { name: 'Zonder login' }), StatusCodes.UNAUTHORIZED],
+        [request('PATCH', '/party-admin/party', superadmin.token, { name: 'Superadmin' }), StatusCodes.FORBIDDEN],
+        [request('DELETE', '/party-admin/party', partyAdmin.token), StatusCodes.METHOD_NOT_ALLOWED],
+        [request('PATCH', '/party-admin/party', partyAdmin.token, { isActive: false }), StatusCodes.FORBIDDEN],
+        [request('PATCH', '/party-admin/party', partyAdmin.token, { name: 'X', isActive: true }), StatusCodes.FORBIDDEN],
+      ];
+
+      for (const [pending, status] of cases) {
+        const response = await pending;
+
+        strictEqual(response.status, status);
+        await response.text();
+      }
+
+      strictEqual(database.prepare('SELECT name FROM parties WHERE id = 1').get()?.['name'], 'Partij A Nieuw');
     });
 
     await context.test('ends the session when the party admin is removed', async () => {

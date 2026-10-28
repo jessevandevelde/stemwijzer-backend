@@ -187,7 +187,9 @@ Alle vier routes geven `400` bij ongeldige invoer of een ongeldig ID in de URL, 
 - Een partijbeheerder (tabel `party_admins`) hoort bij precies één partij. Hij kan alleen:
   - `GET /party-admin/statements`: de actieve stellingen met het standpunt van de eigen partij, als `{ party: { id, name }, statements: [{ statementId, text, answer }] }`.
   - `PUT /party-admin/statements/:id` met `{ "answer": "eens" | "neutraal" | "oneens" | null }`: het standpunt van de eigen partij op een actieve stelling opslaan.
-- De partij komt altijd uit de sessie, niet uit de URL. Een partijbeheerder kan daardoor geen andere partij wijzigen, en ook niet de naam of gegevens van de eigen partij of zijn eigen account.
+  - `GET /party-admin/party`: de gegevens van de eigen partij, in hetzelfde formaat als `GET /parties/:id`.
+  - `PATCH /party-admin/party` met één of meer van `name`, `description`, `imageUrl`, `abbreviation`, `color`, `seats` en `leader`, volgens dezelfde validatie als `PATCH /parties/:id`. Alleen `isActive` is voorbehouden aan superadmins en geeft `403`.
+- De partij komt altijd uit de sessie, niet uit de URL. Een partijbeheerder kan daardoor geen andere partij wijzigen, de eigen partij niet (de)activeren en zijn eigen account niet wijzigen.
 
 Een partijbeheerder aanmaken:
 

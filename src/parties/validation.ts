@@ -1,4 +1,5 @@
 import type { CreatePartyInput, UpdatePartyInput } from '../types/party.interface';
+import { StatusCodes } from 'http-status-codes';
 import { RequestError } from '../http/request-error';
 
 const maximumNameLength = 100;
@@ -161,4 +162,13 @@ export function validateUpdateParty(body: unknown): UpdatePartyInput {
   }
 
   return result;
+}
+
+// Een partijbeheerder mag alle gegevens van zijn eigen partij wijzigen, behalve of de partij actief is.
+export function validatePartyAdminUpdate(body: unknown): UpdatePartyInput {
+  if (typeof body === 'object' && body !== null && 'isActive' in body) {
+    throw new RequestError('isActive kan alleen door een superadmin worden gewijzigd.', StatusCodes.FORBIDDEN);
+  }
+
+  return validateUpdateParty(body);
 }

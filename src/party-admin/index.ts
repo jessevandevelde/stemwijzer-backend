@@ -3,6 +3,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 import { readJsonBody } from '../http/read-json-body';
 import { RequestError } from '../http/request-error';
+import { getPartyById } from '../parties/get-party';
+import { updateParty } from '../parties/update-party';
+import { validatePartyAdminUpdate } from '../parties/validation';
 import { getPartyAnswer, listPartyAnswers } from '../party-answers/list-party-answers';
 import { setPartyAnswer } from '../party-answers/set-party-answer';
 import { validatePartyAnswer } from '../party-answers/validation';
@@ -70,5 +73,50 @@ export async function handleSetPartyAdminAnswerRequest(
     console.error('Standpunt van partijbeheerder opslaan mislukt:', error);
     response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
     response.end(JSON.stringify({ error: 'Het standpunt kon niet worden opgeslagen.' }));
+  }
+}
+
+export function handleGetPartyAdminPartyRequest(database: DatabaseSync, user: AuthenticatedUser, response: ServerResponse): void {
+  try {
+    response.writeHead(StatusCodes.OK);
+    response.end(JSON.stringify(getPartyById(database, Number(user.partyId))));
+  }
+  catch (error: unknown) {
+    console.error('Partij voor partijbeheerder ophalen mislukt:', error);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
+    response.end(JSON.stringify({ error: 'De partijgegevens konden niet worden opgehaald.' }));
+  }
+}
+
+export async function handleUpdatePartyAdminPartyRequest(
+  database: DatabaseSync,
+  user: AuthenticatedUser,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  try {
+    const partyId = Number(user.partyId);
+    const body = await readJsonBody(request);
+
+    updateParty(database, partyId, validatePartyAdminUpdate(body));
+
+    response.writeHead(StatusCodes.OK);
+    response.end(JSON.stringify(getPartyById(database, partyId)));
+  }
+  catch (error: unknown) {
+    if (response.destroyed) {
+      return;
+    }
+
+    if (error instanceof RequestError) {
+      response.writeHead(error.status);
+      response.end(JSON.stringify({ error: error.message }));
+
+      return;
+    }
+
+    console.error('Partijgegevens van partijbeheerder opslaan mislukt:', error);
+    response.writeHead(StatusCodes.INTERNAL_SERVER_ERROR);
+    response.end(JSON.stringify({ error: 'De partijgegevens konden niet worden opgeslagen.' }));
   }
 }
