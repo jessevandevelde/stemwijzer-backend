@@ -178,3 +178,21 @@ Naast het aanmaken bestaan er routes om partijen op te vragen, te wijzigen en te
 - `DELETE /parties/:id` verwijdert de partij en geeft `204` terug, of `404` als het ID niet bestaat. Zolang er nog partijantwoorden van deze partij bestaan, geeft dit `409`; verwijder die antwoorden eerst.
 
 Alle vier routes geven `400` bij ongeldige invoer of een ongeldig ID in de URL, `405` bij een niet-ondersteunde methode en `500` bij een databasefout. De code staat in `src/parties/` (`list-parties.ts`, `get-party.ts`, `update-party.ts`, `delete-party.ts`, `validation.ts`), de routering in `src/server.ts`.
+
+## Inloggen en partijbeheerders
+
+`POST /auth/login` met `{ "email": "...", "password": "..." }` werkt voor superadmins en partijbeheerders. De response bevat een `token` en `user` met `role` (`superadmin` of `party-admin`); voor een partijbeheerder ook `partyId` en `partyName`. Stuur het token mee als `Authorization: Bearer <token>`. Sessies staan in `auth_sessions` (alleen de SHA-256-hash van het token) en verlopen na 7 dagen.
+
+- Alle schrijfroutes voor stellingen, partijen en partijantwoorden (`POST`, `PATCH`, `PUT`, `DELETE`) vereisen een superadmin-token. Zonder geldig token volgt `401`, met een token van een andere rol `403`. De leesroutes en `/matching` blijven openbaar.
+- Een partijbeheerder (tabel `party_admins`) hoort bij precies één partij. Hij kan alleen:
+  - `GET /party-admin/statements`: de actieve stellingen met het standpunt van de eigen partij, als `{ party: { id, name }, statements: [{ statementId, text, answer }] }`.
+  - `PUT /party-admin/statements/:id` met `{ "answer": "eens" | "neutraal" | "oneens" | null }`: het standpunt van de eigen partij op een actieve stelling opslaan.
+- De partij komt altijd uit de sessie, niet uit de URL. Een partijbeheerder kan daardoor geen andere partij wijzigen, en ook niet de naam of gegevens van de eigen partij of zijn eigen account.
+
+Een partijbeheerder aanmaken:
+
+```sh
+npm run db:add-party-admin -- --party 1 --name "Naam" --email naam@example.com --password Wachtwoord1!
+```
+
+`npm run db:seed` maakt voor iedere partij een testpartijbeheerder aan: `partij1@stemwijzer.test`, `partij2@stemwijzer.test`, enzovoort, allemaal met wachtwoord `Test1234!`. Wordt een partij verwijderd, dan worden haar partijbeheerders ook verwijderd.

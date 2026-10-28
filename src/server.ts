@@ -12,6 +12,7 @@ import {
 } from './statements';
 import { handleMatchingRequest } from './matching';
 import { handleLoginRequest } from './auth';
+import { authorize } from './auth/authorize';
 import {
   handleCreatePartyRequest,
   handleListPartiesRequest,
@@ -20,12 +21,14 @@ import {
   handleDeletePartyRequest,
 } from './parties';
 import { handleListPartyAnswersRequest, handleSetPartyAnswerRequest } from './party-answers';
+import { handleListPartyAdminStatementsRequest, handleSetPartyAdminAnswerRequest } from './party-admin';
 import { parseId } from './http/parse-id';
 
 const statementIdPattern = /^\/statements\/([^/]+)$/u;
 const partyIdPattern = /^\/parties\/([^/]+)$/u;
 const partyAnswersPattern = /^\/parties\/([^/]+)\/answers$/u;
 const partyAnswerPattern = /^\/parties\/([^/]+)\/answers\/([^/]+)$/u;
+const partyAdminStatementPattern = /^\/party-admin\/statements\/([^/]+)$/u;
 
 export function createApp(database: DatabaseSync): Server {
   return createServer((request, response) => {
@@ -69,7 +72,9 @@ export function createApp(database: DatabaseSync): Server {
         }
 
         if (method === 'POST') {
-          void handleCreateStatementRequest(database, request, response);
+          if (authorize(database, request, response, 'superadmin')) {
+            void handleCreateStatementRequest(database, request, response);
+          }
 
           return;
         }
@@ -112,13 +117,17 @@ export function createApp(database: DatabaseSync): Server {
         }
 
         if (method === 'PATCH') {
-          void handleUpdateStatementRequest(database, id, request, response);
+          if (authorize(database, request, response, 'superadmin')) {
+            void handleUpdateStatementRequest(database, id, request, response);
+          }
 
           return;
         }
 
         if (method === 'DELETE') {
-          handleDeleteStatementRequest(database, id, response);
+          if (authorize(database, request, response, 'superadmin')) {
+            handleDeleteStatementRequest(database, id, response);
+          }
 
           return;
         }
@@ -137,7 +146,9 @@ export function createApp(database: DatabaseSync): Server {
         }
 
         if (method === 'POST') {
-          void handleCreatePartyRequest(database, request, response);
+          if (authorize(database, request, response, 'superadmin')) {
+            void handleCreatePartyRequest(database, request, response);
+          }
 
           return;
         }
@@ -192,7 +203,9 @@ export function createApp(database: DatabaseSync): Server {
           return;
         }
 
-        void handleSetPartyAnswerRequest(database, partyId, statementId, request, response);
+        if (authorize(database, request, response, 'superadmin')) {
+          void handleSetPartyAnswerRequest(database, partyId, statementId, request, response);
+        }
 
         return;
       }
@@ -216,19 +229,68 @@ export function createApp(database: DatabaseSync): Server {
         }
 
         if (method === 'PATCH') {
-          void handleUpdatePartyRequest(database, id, request, response);
+          if (authorize(database, request, response, 'superadmin')) {
+            void handleUpdatePartyRequest(database, id, request, response);
+          }
 
           return;
         }
 
         if (method === 'DELETE') {
-          handleDeletePartyRequest(database, id, response);
+          if (authorize(database, request, response, 'superadmin')) {
+            handleDeletePartyRequest(database, id, response);
+          }
 
           return;
         }
 
         response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, PATCH, DELETE' });
         response.end(JSON.stringify({ error: 'Gebruik GET, PATCH of DELETE voor deze route.' }));
+
+        return;
+      }
+
+      if (url.pathname === '/party-admin/statements') {
+        if (method !== 'GET') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET' });
+          response.end(JSON.stringify({ error: 'Gebruik GET voor deze route.' }));
+
+          return;
+        }
+
+        const user = authorize(database, request, response, 'party-admin');
+
+        if (user) {
+          handleListPartyAdminStatementsRequest(database, user, response);
+        }
+
+        return;
+      }
+
+      const partyAdminStatementMatch = partyAdminStatementPattern.exec(url.pathname);
+
+      if (partyAdminStatementMatch) {
+        const statementId = parseId(partyAdminStatementMatch[1]);
+
+        if (statementId === undefined) {
+          response.writeHead(StatusCodes.BAD_REQUEST);
+          response.end(JSON.stringify({ error: 'Het id in de URL moet een positief geheel getal zijn.' }));
+
+          return;
+        }
+
+        if (method !== 'PUT') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'PUT' });
+          response.end(JSON.stringify({ error: 'Gebruik PUT voor deze route.' }));
+
+          return;
+        }
+
+        const user = authorize(database, request, response, 'party-admin');
+
+        if (user) {
+          void handleSetPartyAdminAnswerRequest(database, user, statementId, request, response);
+        }
 
         return;
       }

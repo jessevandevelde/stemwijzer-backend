@@ -2,6 +2,7 @@ import { StatusCodes } from 'http-status-codes';
 import { deepStrictEqual, strictEqual, ok } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
+import { createSession } from '../auth/sessions';
 import { openDatabase } from '../database';
 import { createApp } from '../server';
 
@@ -28,8 +29,12 @@ void it('creates parties over HTTP', async (context) => {
 
     const url = `http://127.0.0.1:${String(address.port)}/parties`;
 
+    database.exec('INSERT INTO superadmins (id, name, email, password_hash) VALUES (1, \'Test\', \'test@example.test\', \'!disabled\')');
+
+    const authorization: [string, string] = ['authorization', `Bearer ${createSession(database, 'superadmin', 1)}`];
+
     async function post(body: unknown): Promise<Response> {
-      return fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body: JSON.stringify(body) });
+      return fetch(url, { method: 'POST', headers: [['content-type', 'application/json'], authorization], body: JSON.stringify(body) });
     }
 
     await context.test('creates a named party with defaults and timestamps', async () => {
@@ -111,18 +116,18 @@ void it('creates parties over HTTP', async (context) => {
       const before = database.prepare('SELECT COUNT(*) AS count FROM parties').get();
 
       for (const body of ['', '{']) {
-        const response = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body });
+        const response = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json'], authorization], body });
 
         strictEqual(response.status, StatusCodes.BAD_REQUEST);
         await response.text();
       }
 
-      const wrongType = await fetch(url, { method: 'POST', body: '{}' });
+      const wrongType = await fetch(url, { method: 'POST', headers: [authorization], body: '{}' });
 
       strictEqual(wrongType.status, StatusCodes.UNSUPPORTED_MEDIA_TYPE);
       await wrongType.text();
 
-      const tooLarge = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json']], body: ' '.repeat(oversizedLength) });
+      const tooLarge = await fetch(url, { method: 'POST', headers: [['content-type', 'application/json'], authorization], body: ' '.repeat(oversizedLength) });
 
       strictEqual(tooLarge.status, StatusCodes.REQUEST_TOO_LONG);
       await tooLarge.text();
@@ -142,7 +147,7 @@ void it('creates parties over HTTP', async (context) => {
       const response = await post({ name: 'Valid' });
 
       strictEqual(response.status, StatusCodes.INTERNAL_SERVER_ERROR);
-      deepStrictEqual(await response.json(), { error: 'De partij kon niet worden aangemaakt.' });
+      deepStrictEqual(await response.json(), { error: 'De aanvraag kon niet worden verwerkt.' });
     });
   }
   finally {
@@ -181,8 +186,12 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
 
     const baseUrl = `http://127.0.0.1:${String(address.port)}/parties`;
 
+    database.exec('INSERT INTO superadmins (id, name, email, password_hash) VALUES (1, \'Test\', \'test@example.test\', \'!disabled\')');
+
+    const authorization: [string, string] = ['authorization', `Bearer ${createSession(database, 'superadmin', 1)}`];
+
     async function patch(id: number, body: unknown): Promise<Response> {
-      return fetch(`${baseUrl}/${String(id)}`, { method: 'PATCH', headers: [['content-type', 'application/json']], body: JSON.stringify(body) });
+      return fetch(`${baseUrl}/${String(id)}`, { method: 'PATCH', headers: [['content-type', 'application/json'], authorization], body: JSON.stringify(body) });
     }
 
     await context.test('returns an empty list when there are no parties', async () => {
@@ -281,12 +290,11 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
 
     await context.test('blocks deletion while party answers reference the party', async () => {
       database.exec(`
-        INSERT INTO superadmins (id, name, email, password_hash) VALUES (1, 'Test', 'test@example.test', '!disabled');
         INSERT INTO statements (id, text, created_by) VALUES (1, 'Een stelling', 1);
         INSERT INTO party_answers (party_id, statement_id, answer) VALUES (2, 1, 'eens');
       `);
 
-      const response = await fetch(`${baseUrl}/2`, { method: 'DELETE' });
+      const response = await fetch(`${baseUrl}/2`, { method: 'DELETE', headers: [authorization] });
 
       strictEqual(response.status, StatusCodes.CONFLICT);
       await response.text();
@@ -294,7 +302,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
     });
 
     await context.test('deletes a party without references and returns 404 afterwards', async () => {
-      const response = await fetch(`${baseUrl}/1`, { method: 'DELETE' });
+      const response = await fetch(`${baseUrl}/1`, { method: 'DELETE', headers: [authorization] });
 
       strictEqual(response.status, StatusCodes.NO_CONTENT);
 
@@ -303,7 +311,7 @@ void it('lists, reads, updates and deletes parties over HTTP', async (context) =
       strictEqual(gone.status, StatusCodes.NOT_FOUND);
       await gone.text();
 
-      const secondDelete = await fetch(`${baseUrl}/1`, { method: 'DELETE' });
+      const secondDelete = await fetch(`${baseUrl}/1`, { method: 'DELETE', headers: [authorization] });
 
       strictEqual(secondDelete.status, StatusCodes.NOT_FOUND);
       await secondDelete.text();

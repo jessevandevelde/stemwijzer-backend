@@ -46,14 +46,41 @@ CREATE TABLE IF NOT EXISTS party_answers (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Een partijbeheerder hoort bij precies één partij en mag alleen de standpunten van die partij wijzigen.
+CREATE TABLE IF NOT EXISTS party_admins (
+    id INTEGER PRIMARY KEY,
+    party_id INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL CHECK (length(name) <= 100),
+    email VARCHAR(100) NOT NULL UNIQUE CHECK (length(email) <= 100),
+    password_hash VARCHAR(255) NOT NULL CHECK (length(password_hash) <= 255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Alleen de SHA-256-hash van een token wordt bewaard; user_id verwijst naar superadmins of party_admins, afhankelijk van role.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    token_hash VARCHAR(64) PRIMARY KEY CHECK (length(token_hash) = 64),
+    role TEXT NOT NULL CHECK (role IN ('superadmin', 'party-admin')),
+    user_id INTEGER NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_statements_created_by ON statements(created_by);
 CREATE INDEX IF NOT EXISTS idx_party_answers_party_id ON party_answers(party_id);
 CREATE INDEX IF NOT EXISTS idx_party_answers_statement_id ON party_answers(statement_id);
+CREATE INDEX IF NOT EXISTS idx_party_admins_party_id ON party_admins(party_id);
 
 CREATE TRIGGER IF NOT EXISTS superadmins_updated_at
 AFTER UPDATE OF name, email, password_hash ON superadmins
 BEGIN
     UPDATE superadmins SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS party_admins_updated_at
+AFTER UPDATE OF party_id, name, email, password_hash ON party_admins
+BEGIN
+    UPDATE party_admins SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
 CREATE TRIGGER IF NOT EXISTS statements_updated_at

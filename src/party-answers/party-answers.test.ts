@@ -2,6 +2,7 @@ import { StatusCodes } from 'http-status-codes';
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
+import { createSession } from '../auth/sessions';
 import { openDatabase } from '../database';
 import { createApp } from '../server';
 
@@ -30,9 +31,10 @@ void it('reads and sets party answers over HTTP', async (context) => {
     }
 
     const baseUrl = `http://127.0.0.1:${String(address.port)}`;
+    const authorization: [string, string] = ['authorization', `Bearer ${createSession(database, 'superadmin', 1)}`];
 
     async function put(path: string, body: unknown): Promise<Response> {
-      return fetch(`${baseUrl}${path}`, { method: 'PUT', headers: [['content-type', 'application/json']], body: JSON.stringify(body) });
+      return fetch(`${baseUrl}${path}`, { method: 'PUT', headers: [['content-type', 'application/json'], authorization], body: JSON.stringify(body) });
     }
 
     function answerCount(partyId: number, statementId: number): unknown {

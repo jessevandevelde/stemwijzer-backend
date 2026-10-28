@@ -2,10 +2,12 @@ import { StatusCodes } from 'http-status-codes';
 import { deepStrictEqual, strictEqual, notStrictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
+import { createSession } from '../auth/sessions';
 import { openDatabase } from '../database';
 import { createApp } from '../server';
 
 const nonExistentId = 999;
+const superadminCountWithImportAccount = 2;
 
 void it('serves statements and party answers over HTTP', async (context) => {
   const database = openDatabase(':memory:');
@@ -166,12 +168,16 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
 
     const baseUrl = `http://127.0.0.1:${String(address.port)}/statements`;
 
+    database.exec('INSERT INTO superadmins (id, name, email, password_hash) VALUES (1, \'Test\', \'test@example.test\', \'!disabled\')');
+
+    const authorization: [string, string] = ['authorization', `Bearer ${createSession(database, 'superadmin', 1)}`];
+
     async function post(body: unknown): Promise<Response> {
-      return fetch(baseUrl, { method: 'POST', headers: [['content-type', 'application/json']], body: JSON.stringify(body) });
+      return fetch(baseUrl, { method: 'POST', headers: [['content-type', 'application/json'], authorization], body: JSON.stringify(body) });
     }
 
     async function patch(id: number, body: unknown): Promise<Response> {
-      return fetch(`${baseUrl}/${String(id)}`, { method: 'PATCH', headers: [['content-type', 'application/json']], body: JSON.stringify(body) });
+      return fetch(`${baseUrl}/${String(id)}`, { method: 'PATCH', headers: [['content-type', 'application/json'], authorization], body: JSON.stringify(body) });
     }
 
     await context.test('creates a statement, provisioning a technical superadmin as needed', async () => {
@@ -198,7 +204,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
         throw new Error('Expected the superadmin count to be returned.');
       }
 
-      strictEqual(adminCount['count'], 1);
+      strictEqual(adminCount['count'], superadminCountWithImportAccount);
     });
 
     await context.test('rejects invalid create bodies without inserting rows', async () => {
@@ -314,7 +320,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
         INSERT INTO party_answers (party_id, statement_id, answer) VALUES (1, 1, 'eens');
       `);
 
-      const response = await fetch(`${baseUrl}/1`, { method: 'DELETE' });
+      const response = await fetch(`${baseUrl}/1`, { method: 'DELETE', headers: [authorization] });
 
       strictEqual(response.status, StatusCodes.CONFLICT);
       await response.text();
@@ -322,7 +328,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
     });
 
     await context.test('deletes a statement without references and returns 404 afterwards', async () => {
-      const response = await fetch(`${baseUrl}/2`, { method: 'DELETE' });
+      const response = await fetch(`${baseUrl}/2`, { method: 'DELETE', headers: [authorization] });
 
       strictEqual(response.status, StatusCodes.NO_CONTENT);
 
@@ -331,7 +337,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       strictEqual(gone.status, StatusCodes.NOT_FOUND);
       await gone.text();
 
-      const secondDelete = await fetch(`${baseUrl}/2`, { method: 'DELETE' });
+      const secondDelete = await fetch(`${baseUrl}/2`, { method: 'DELETE', headers: [authorization] });
 
       strictEqual(secondDelete.status, StatusCodes.NOT_FOUND);
       await secondDelete.text();

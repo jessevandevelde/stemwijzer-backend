@@ -53,7 +53,7 @@ void it('logs superadmins in over HTTP', async (context) => {
 
       if (isLoginResponse(body)) {
         strictEqual(body.token.length > 0, true);
-        deepStrictEqual(body.user, { id: 1, name: 'Beheerder', email: 'beheerder@example.test' });
+        deepStrictEqual(body.user, { id: 1, name: 'Beheerder', email: 'beheerder@example.test', role: 'superadmin' });
       }
     });
 
