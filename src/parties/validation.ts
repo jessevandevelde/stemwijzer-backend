@@ -1,6 +1,7 @@
 import type { CreatePartyInput, UpdatePartyInput } from '../types/party.interface';
 import { StatusCodes } from 'http-status-codes';
 import { RequestError } from '../http/request-error';
+import { uploadUrlPattern } from '../uploads';
 
 const maximumNameLength = 100;
 const maximumImageUrlLength = 255;
@@ -41,6 +42,11 @@ function validateImageUrl(value: unknown): string | null {
 
   if (typeof value !== 'string' || value.trim().length === 0 || Array.from(value.trim()).length > maximumImageUrlLength || value.includes('\0')) {
     throw new RequestError('imageUrl moet een URL van maximaal 255 tekens of null zijn.');
+  }
+
+  // Een via POST /uploads geüploade afbeelding wordt opgeslagen als relatief pad.
+  if (uploadUrlPattern.test(value.trim())) {
+    return value.trim();
   }
 
   try {

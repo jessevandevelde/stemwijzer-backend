@@ -6,8 +6,13 @@ import { findSessionUser } from './sessions';
 
 const bearerPattern = /^Bearer ([0-9a-f]{64})$/u;
 
-// Schrijft zelf 401 of 403 naar de response wanneer de aanvraag niet van een ingelogde gebruiker met deze rol komt.
-export function authorize(database: DatabaseSync, request: IncomingMessage, response: ServerResponse, role: UserRole): AuthenticatedUser | undefined {
+// Schrijft zelf 401 of 403 naar de response wanneer de aanvraag niet van een ingelogde gebruiker met een van deze rollen komt.
+export function authorize(
+  database: DatabaseSync,
+  request: IncomingMessage,
+  response: ServerResponse,
+  role: UserRole | readonly UserRole[],
+): AuthenticatedUser | undefined {
   const token = bearerPattern.exec(request.headers.authorization ?? '')?.[1];
   const user = token === undefined ? null : findSessionUser(database, token);
 
@@ -19,7 +24,7 @@ export function authorize(database: DatabaseSync, request: IncomingMessage, resp
     return undefined;
   }
 
-  if (user.role !== role) {
+  if (!(typeof role === 'string' ? [role] : role).includes(user.role)) {
     request.resume();
     response.writeHead(StatusCodes.FORBIDDEN);
     response.end(JSON.stringify({ error: 'Je hebt geen toegang tot deze actie.' }));

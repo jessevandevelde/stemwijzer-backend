@@ -27,21 +27,60 @@ import {
   handleSetPartyAdminAnswerRequest,
   handleUpdatePartyAdminPartyRequest,
 } from './party-admin';
+import {
+  handleCreatePartyAdminRequest,
+  handleDeletePartyAdminRequest,
+  handleListPartyAdminsRequest,
+  handleUpdatePartyAdminRequest,
+} from './party-admins';
 import { parseId } from './http/parse-id';
+import { defaultUploadDir, handleServeUploadRequest, handleUploadImageRequest, uploadUrlPattern } from './uploads';
 
 const statementIdPattern = /^\/statements\/([^/]+)$/u;
 const partyIdPattern = /^\/parties\/([^/]+)$/u;
 const partyAnswersPattern = /^\/parties\/([^/]+)\/answers$/u;
 const partyAnswerPattern = /^\/parties\/([^/]+)\/answers\/([^/]+)$/u;
+const partyAdminsPattern = /^\/parties\/([^/]+)\/admins$/u;
+const partyAdminAccountPattern = /^\/party-admins\/([^/]+)$/u;
 const partyAdminStatementPattern = /^\/party-admin\/statements\/([^/]+)$/u;
 
-export function createApp(database: DatabaseSync): Server {
+export function createApp(database: DatabaseSync, uploadDir = defaultUploadDir): Server {
   return createServer((request, response) => {
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
 
     try {
       const url = new URL(request.url ?? '/', 'http://localhost');
       const method = request.method ?? '';
+
+      if (url.pathname === '/uploads') {
+        if (method !== 'POST') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'POST' });
+          response.end(JSON.stringify({ error: 'Gebruik POST voor deze route.' }));
+
+          return;
+        }
+
+        if (authorize(database, request, response, ['superadmin', 'party-admin'])) {
+          void handleUploadImageRequest(uploadDir, request, response);
+        }
+
+        return;
+      }
+
+      const uploadMatch = uploadUrlPattern.exec(url.pathname);
+
+      if (uploadMatch?.[1] !== undefined) {
+        if (method !== 'GET') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET' });
+          response.end(JSON.stringify({ error: 'Gebruik GET voor deze route.' }));
+
+          return;
+        }
+
+        void handleServeUploadRequest(uploadDir, uploadMatch[1], response);
+
+        return;
+      }
 
       if (url.pathname === '/auth/login') {
         if (method !== 'POST') {
@@ -160,6 +199,72 @@ export function createApp(database: DatabaseSync): Server {
 
         response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, POST' });
         response.end(JSON.stringify({ error: 'Gebruik GET of POST voor deze route.' }));
+
+        return;
+      }
+
+      const partyAdminsMatch = partyAdminsPattern.exec(url.pathname);
+
+      if (partyAdminsMatch) {
+        const partyId = parseId(partyAdminsMatch[1]);
+
+        if (partyId === undefined) {
+          response.writeHead(StatusCodes.BAD_REQUEST);
+          response.end(JSON.stringify({ error: 'Het id in de URL moet een positief geheel getal zijn.' }));
+
+          return;
+        }
+
+        if (method !== 'GET' && method !== 'POST') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'GET, POST' });
+          response.end(JSON.stringify({ error: 'Gebruik GET of POST voor deze route.' }));
+
+          return;
+        }
+
+        if (!authorize(database, request, response, 'superadmin')) {
+          return;
+        }
+
+        if (method === 'GET') {
+          handleListPartyAdminsRequest(database, partyId, response);
+        }
+        else {
+          void handleCreatePartyAdminRequest(database, partyId, request, response);
+        }
+
+        return;
+      }
+
+      const partyAdminAccountMatch = partyAdminAccountPattern.exec(url.pathname);
+
+      if (partyAdminAccountMatch) {
+        const id = parseId(partyAdminAccountMatch[1]);
+
+        if (id === undefined) {
+          response.writeHead(StatusCodes.BAD_REQUEST);
+          response.end(JSON.stringify({ error: 'Het id in de URL moet een positief geheel getal zijn.' }));
+
+          return;
+        }
+
+        if (method !== 'PATCH' && method !== 'DELETE') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'PATCH, DELETE' });
+          response.end(JSON.stringify({ error: 'Gebruik PATCH of DELETE voor deze route.' }));
+
+          return;
+        }
+
+        if (!authorize(database, request, response, 'superadmin')) {
+          return;
+        }
+
+        if (method === 'PATCH') {
+          void handleUpdatePartyAdminRequest(database, id, request, response);
+        }
+        else {
+          handleDeletePartyAdminRequest(database, id, response);
+        }
 
         return;
       }

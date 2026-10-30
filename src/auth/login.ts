@@ -22,7 +22,7 @@ export function authenticatePartyAdmin(database: DatabaseSync, email: string, pa
            parties.id AS partyId, parties.name AS partyName
     FROM party_admins
     JOIN parties ON parties.id = party_admins.party_id
-    WHERE party_admins.email = ?
+    WHERE lower(party_admins.email) = lower(?)
   `).get(email);
 
   if (!row || typeof row['id'] !== 'number' || typeof row['name'] !== 'string' || typeof row['email'] !== 'string'

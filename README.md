@@ -191,10 +191,30 @@ Alle vier routes geven `400` bij ongeldige invoer of een ongeldig ID in de URL, 
   - `PATCH /party-admin/party` met één of meer van `name`, `description`, `imageUrl`, `abbreviation`, `color`, `seats` en `leader`, volgens dezelfde validatie als `PATCH /parties/:id`. Alleen `isActive` is voorbehouden aan superadmins en geeft `403`.
 - De partij komt altijd uit de sessie, niet uit de URL. Een partijbeheerder kan daardoor geen andere partij wijzigen, de eigen partij niet (de)activeren en zijn eigen account niet wijzigen.
 
-Een partijbeheerder aanmaken:
+Superadmins beheren de inloggegevens van partijen via de partijpagina in het CMS, of via deze routes (allemaal alleen voor superadmins):
+
+- `GET /parties/:id/admins`: de accounts van een partij, als `{ id, partyId, name, email, createdAt, updatedAt }`. Wachtwoorden worden nooit teruggegeven.
+- `POST /parties/:id/admins` met `{ "name", "email", "password" }`: een account aanmaken. Het wachtwoord moet minimaal 8 tekens hebben.
+- `PATCH /party-admins/:id` met één of meer van `name`, `email` en `password`. Een nieuw wachtwoord logt de partijbeheerder overal uit.
+- `DELETE /party-admins/:id`: het account verwijderen en de partijbeheerder uitloggen.
+
+E-mailadressen worden in kleine letters opgeslagen en moeten uniek zijn over superadmins en partijbeheerders samen; een dubbel adres geeft `409`.
+
+Een partijbeheerder aanmaken vanaf de commandoregel:
 
 ```sh
 npm run db:add-party-admin -- --party 1 --name "Naam" --email naam@example.com --password Wachtwoord1!
 ```
 
 `npm run db:seed` maakt voor iedere partij een testpartijbeheerder aan: `partij1@stemwijzer.test`, `partij2@stemwijzer.test`, enzovoort, allemaal met wachtwoord `Test1234!`. Wordt een partij verwijderd, dan worden haar partijbeheerders ook verwijderd.
+
+## Afbeeldingen uploaden
+
+Partijlogo's worden in het CMS vanaf de eigen computer geüpload in plaats van via een link.
+
+- `POST /uploads` met de afbeelding als body en `Content-Type` `image/png`, `image/jpeg`, `image/gif` of `image/webp` (maximaal 2 MB). Alleen voor ingelogde superadmins en partijbeheerders. De backend controleert ook de inhoud van het bestand en geeft `201` met `{ "url": "/uploads/<naam>" }`. SVG wordt bewust geweigerd (`415`), omdat dat scripts kan bevatten.
+- `GET /uploads/<naam>` geeft de afbeelding terug. Bestandsnamen zijn willekeurig; andere paden geven `404`.
+- Gebruik de teruggegeven `url` als `imageUrl` van een partij. `imageUrl` accepteert zowel een volledige HTTP(S)-URL als zo'n `/uploads/`-pad.
+
+Bestanden staan in `data/uploads` (instelbaar met `UPLOAD_DIR`) en worden net als de database niet in versiebeheer opgenomen. Een vervangen logo blijft als bestand staan.
+
