@@ -20,7 +20,14 @@ CREATE TABLE IF NOT EXISTS statements (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
     economic_weight REAL NOT NULL DEFAULT 0 CHECK (economic_weight BETWEEN -1 AND 1),
-    cultural_weight REAL NOT NULL DEFAULT 0 CHECK (cultural_weight BETWEEN -1 AND 1)
+    cultural_weight REAL NOT NULL DEFAULT 0 CHECK (cultural_weight BETWEEN -1 AND 1),
+    -- Toelichting voor kiezers; arguments_for en arguments_against bevatten een JSON-lijst met teksten.
+    title VARCHAR(100) CHECK (length(title) <= 100),
+    theme VARCHAR(100) CHECK (length(theme) <= 100),
+    explanation TEXT,
+    consequence TEXT,
+    arguments_for TEXT,
+    arguments_against TEXT
 );
 
 CREATE TABLE IF NOT EXISTS parties (
@@ -42,6 +49,7 @@ CREATE TABLE IF NOT EXISTS party_answers (
     party_id INTEGER NOT NULL REFERENCES parties(id),
     statement_id INTEGER NOT NULL REFERENCES statements(id),
     answer TEXT NOT NULL CHECK (answer IN ('eens', 'neutraal', 'oneens')),
+    explanation TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -84,7 +92,7 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS statements_updated_at
-AFTER UPDATE OF text, created_by, is_active, economic_weight, cultural_weight ON statements
+AFTER UPDATE OF text, created_by, is_active, economic_weight, cultural_weight, title, theme, explanation, consequence, arguments_for, arguments_against ON statements
 BEGIN
     UPDATE statements SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
@@ -96,7 +104,7 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS party_answers_updated_at
-AFTER UPDATE OF party_id, statement_id, answer ON party_answers
+AFTER UPDATE OF party_id, statement_id, answer, explanation ON party_answers
 BEGIN
     UPDATE party_answers SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;

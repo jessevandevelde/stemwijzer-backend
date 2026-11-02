@@ -40,7 +40,7 @@ export async function handleSetPartyAnswerRequest(
 ): Promise<void> {
   try {
     const body = await readJsonBody(request);
-    const answer = validatePartyAnswer(body);
+    const input = validatePartyAnswer(body);
 
     if (!getPartyById(database, partyId)) {
       writePartyNotFound(response);
@@ -55,7 +55,7 @@ export async function handleSetPartyAnswerRequest(
       return;
     }
 
-    setPartyAnswer(database, partyId, statementId, answer);
+    setPartyAnswer(database, partyId, statementId, input);
 
     response.writeHead(StatusCodes.OK);
     response.end(JSON.stringify(getPartyAnswer(database, partyId, statementId)));

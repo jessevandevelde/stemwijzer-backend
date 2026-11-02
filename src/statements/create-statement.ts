@@ -1,5 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { CreateStatementInput, StatementRecord } from '../types/statement.interface';
+import { detailColumns } from './details-columns';
+import { getStatementById } from './get-statement-by-id';
 
 const technicalAdminEmail = 'statements-import@stemwijzer.invalid';
 
@@ -22,21 +24,16 @@ function ensureTechnicalAdmin(database: DatabaseSync): number {
 export function createStatement(database: DatabaseSync, input: CreateStatementInput): StatementRecord {
   const createdBy = ensureTechnicalAdmin(database);
 
-  const row = database.prepare(`
-    INSERT INTO statements (text, created_by, is_active)
-    VALUES (?, ?, ?)
-    RETURNING id, created_at AS createdAt, updated_at AS updatedAt
-  `).get(input.text, createdBy, input.isActive ? 1 : 0);
+  const columns = [['text', input.text], ['created_by', createdBy], ['is_active', input.isActive ? 1 : 0], ...detailColumns(input)] as const;
 
-  if (!row) {
+  const result = database.prepare(`INSERT INTO statements (${columns.map(([name]) => name).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
+    .run(...columns.map(([, value]) => value));
+
+  const statement = getStatementById(database, Number(result.lastInsertRowid));
+
+  if (!statement) {
     throw new Error('De database heeft geen aangemaakte stelling teruggegeven.');
   }
 
-  const { id, createdAt, updatedAt } = row;
-
-  if (typeof id !== 'number' || typeof createdAt !== 'string' || typeof updatedAt !== 'string') {
-    throw new Error('De database heeft ongeldige stellinggegevens teruggegeven.');
-  }
-
-  return { id, text: input.text, isActive: input.isActive, createdAt, updatedAt };
+  return statement;
 }

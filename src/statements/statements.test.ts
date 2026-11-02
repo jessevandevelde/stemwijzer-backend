@@ -1,5 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
-import { deepStrictEqual, strictEqual, notStrictEqual } from 'node:assert';
+import { deepStrictEqual, notStrictEqual, ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
 import { createSession } from '../auth/sessions';
@@ -7,6 +7,8 @@ import { openDatabase } from '../database';
 import { createApp } from '../server';
 
 const nonExistentId = 999;
+const tooLongTitle = 101;
+const emptyDetails = { title: null, theme: null, explanation: null, consequence: null, argumentsFor: [], argumentsAgainst: [] };
 const superadminCountWithImportAccount = 2;
 
 void it('serves statements and party answers over HTTP', async (context) => {
@@ -53,11 +55,12 @@ void it('serves statements and party answers over HTTP', async (context) => {
         index: 0,
         id: 10,
         text: 'Eerste stelling over CO₂',
+        ...emptyDetails,
         partyAnswers: [
-          { partyId: 1, partyName: 'Partij A', answer: 'eens' },
-          { partyId: 2, partyName: 'Partij B', answer: 'neutraal' },
-          { partyId: 3, partyName: 'Partij C', answer: 'oneens' },
-          { partyId: 4, partyName: 'Nog geen antwoord', answer: null },
+          { partyId: 1, partyName: 'Partij A', abbreviation: null, color: null, answer: 'eens', explanation: null },
+          { partyId: 2, partyName: 'Partij B', abbreviation: null, color: null, answer: 'neutraal', explanation: null },
+          { partyId: 3, partyName: 'Partij C', abbreviation: null, color: null, answer: 'oneens', explanation: null },
+          { partyId: 4, partyName: 'Nog geen antwoord', abbreviation: null, color: null, answer: null, explanation: null },
         ],
       });
     });
@@ -70,11 +73,12 @@ void it('serves statements and party answers over HTTP', async (context) => {
         index: 1,
         id: 30,
         text: 'Laatste stelling',
+        ...emptyDetails,
         partyAnswers: [
-          { partyId: 1, partyName: 'Partij A', answer: 'oneens' },
-          { partyId: 2, partyName: 'Partij B', answer: null },
-          { partyId: 3, partyName: 'Partij C', answer: null },
-          { partyId: 4, partyName: 'Nog geen antwoord', answer: null },
+          { partyId: 1, partyName: 'Partij A', abbreviation: null, color: null, answer: 'oneens', explanation: null },
+          { partyId: 2, partyName: 'Partij B', abbreviation: null, color: null, answer: null, explanation: null },
+          { partyId: 3, partyName: 'Partij C', abbreviation: null, color: null, answer: null, explanation: null },
+          { partyId: 4, partyName: 'Nog geen antwoord', abbreviation: null, color: null, answer: null, explanation: null },
         ],
       });
     });
@@ -110,7 +114,7 @@ void it('serves statements and party answers over HTTP', async (context) => {
 
       const response = await fetch(`${baseUrl}/statements?index=0`);
 
-      deepStrictEqual(await response.json(), { index: 0, id: 10, text: 'Eerste stelling over CO₂', partyAnswers: [] });
+      deepStrictEqual(await response.json(), { index: 0, id: 10, text: 'Eerste stelling over CO₂', ...emptyDetails, partyAnswers: [] });
     });
 
     await context.test('returns 404 when no active statements exist', async () => {
@@ -192,7 +196,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       strictEqual(response.status, StatusCodes.CREATED);
       deepStrictEqual(await response.json(), {
         id: 1, text: 'Nieuwe stelling', isActive: true,
-        createdAt: row['created_at'], updatedAt: row['updated_at'],
+        createdAt: row['created_at'], updatedAt: row['updated_at'], ...emptyDetails,
       });
 
       const secondResponse = await post({ text: 'Tweede stelling', isActive: false });
@@ -205,6 +209,44 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       }
 
       strictEqual(adminCount['count'], superadminCountWithImportAccount);
+    });
+
+    await context.test('stores and clears the explanation of a statement', async () => {
+      const details = {
+        title: ' Hypotheekrenteaftrek ', theme: 'Wonen', explanation: 'Wat het is.', consequence: 'Wat het betekent.',
+        argumentsFor: ['Voor een', '  ', 'Voor twee'], argumentsAgainst: ['Tegen'],
+      };
+
+      const created = await post({ text: 'Stelling met toelichting', ...details });
+      const body: unknown = await created.json();
+
+      strictEqual(created.status, StatusCodes.CREATED);
+      ok(typeof body === 'object' && body !== null && 'id' in body && typeof body.id === 'number');
+      deepStrictEqual(
+        { ...body, id: 0, createdAt: '', updatedAt: '' },
+        {
+          id: 0, text: 'Stelling met toelichting', isActive: true, createdAt: '', updatedAt: '',
+          title: 'Hypotheekrenteaftrek', theme: 'Wonen', explanation: 'Wat het is.', consequence: 'Wat het betekent.',
+          argumentsFor: ['Voor een', 'Voor twee'], argumentsAgainst: ['Tegen'],
+        },
+      );
+
+      const cleared = await patch(body.id, { title: '', explanation: null, argumentsFor: [] });
+      const clearedBody: unknown = await cleared.json();
+
+      ok(typeof clearedBody === 'object' && clearedBody !== null && 'title' in clearedBody && 'argumentsFor' in clearedBody && 'theme' in clearedBody);
+      deepStrictEqual([clearedBody.title, clearedBody.theme, clearedBody.argumentsFor], [null, 'Wonen', []]);
+
+      for (const invalid of [{ title: 'x'.repeat(tooLongTitle) }, { argumentsFor: 'geen lijst' }, { argumentsAgainst: [1] }]) {
+        const response = await patch(body.id, invalid);
+
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(invalid));
+        await response.text();
+      }
+
+      const removed = await fetch(`${baseUrl}/${String(body.id)}`, { method: 'DELETE', headers: [authorization] });
+
+      strictEqual(removed.status, StatusCodes.NO_CONTENT);
     });
 
     await context.test('rejects invalid create bodies without inserting rows', async () => {
@@ -227,7 +269,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), rows.map(row => ({
         id: row['id'], text: row['text'], isActive: row['is_active'] === 1,
-        createdAt: row['created_at'], updatedAt: row['updated_at'],
+        createdAt: row['created_at'], updatedAt: row['updated_at'], ...emptyDetails,
       })));
     });
 
@@ -250,7 +292,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       strictEqual(found.status, StatusCodes.OK);
       deepStrictEqual(await found.json(), {
         id: 1, text: 'Nieuwe stelling', isActive: true,
-        createdAt: row['created_at'], updatedAt: row['updated_at'],
+        createdAt: row['created_at'], updatedAt: row['updated_at'], ...emptyDetails,
       });
 
       const missing = await fetch(`${baseUrl}/${String(nonExistentId)}`);
@@ -280,7 +322,7 @@ void it('creates, lists, reads, updates and deletes statements over HTTP', async
       strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), {
         id: 1, text: 'Gewijzigde stelling', isActive: false,
-        createdAt: after['created_at'], updatedAt: after['updated_at'],
+        createdAt: after['created_at'], updatedAt: after['updated_at'], ...emptyDetails,
       });
       strictEqual(after['is_active'], 0);
       notStrictEqual(after['updated_at'], before['updated_at']);

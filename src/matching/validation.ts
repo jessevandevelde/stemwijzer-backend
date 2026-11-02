@@ -1,17 +1,17 @@
 import { RequestError } from '../http/request-error';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Answer } from '../types/answer.interface';
+import type { UserAnswer } from '../types/matching.interface';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function validateAnswers(database: DatabaseSync, body: unknown): ReadonlyMap<number, Answer> {
+export function validateAnswers(database: DatabaseSync, body: unknown): ReadonlyMap<number, UserAnswer> {
   if (!isRecord(body) || !Array.isArray(body['answers']) || body['answers'].length === 0) {
     throw new RequestError('Stuur een niet-lege answers-lijst met alle antwoorden.');
   }
 
-  const answers = new Map<number, Answer>();
+  const answers = new Map<number, UserAnswer>();
   const items: readonly unknown[] = body['answers'];
 
   for (const item of items) {
@@ -19,7 +19,7 @@ export function validateAnswers(database: DatabaseSync, body: unknown): Readonly
       throw new RequestError('Elk antwoord moet statementId en answer bevatten.');
     }
 
-    const { statementId, answer } = item;
+    const { statementId, answer, important } = item;
 
     if (typeof statementId !== 'number' || !Number.isSafeInteger(statementId) || statementId < 1) {
       throw new RequestError('statementId moet een positief geheel getal zijn, geen index.');
@@ -29,11 +29,15 @@ export function validateAnswers(database: DatabaseSync, body: unknown): Readonly
       throw new RequestError('answer moet eens, neutraal of oneens zijn.');
     }
 
+    if (important !== undefined && typeof important !== 'boolean') {
+      throw new RequestError('important moet true of false zijn.');
+    }
+
     if (answers.has(statementId)) {
       throw new RequestError('Elke stelling mag maar één antwoord hebben.');
     }
 
-    answers.set(statementId, answer);
+    answers.set(statementId, { answer, important: important === true });
   }
 
   const statements = database.prepare('SELECT id FROM statements WHERE is_active = 1').all();

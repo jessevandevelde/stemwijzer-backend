@@ -4,7 +4,7 @@ import { rowToPartyAnswer } from './row-to-party-answer';
 
 const selectPartyAnswers = `
   SELECT statements.id AS statementId, statements.text AS statementText,
-         statements.is_active AS statementIsActive, party_answers.answer
+         statements.is_active AS statementIsActive, party_answers.answer, party_answers.explanation
   FROM statements
   LEFT JOIN party_answers ON party_answers.id = (
     SELECT id FROM party_answers

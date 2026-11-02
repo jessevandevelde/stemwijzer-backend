@@ -46,8 +46,8 @@ void it('reads and sets party answers over HTTP', async (context) => {
 
       strictEqual(response.status, StatusCodes.OK);
       deepStrictEqual(await response.json(), [
-        { statementId: 1, statementText: 'Stelling een', statementIsActive: true, answer: 'oneens' },
-        { statementId: 2, statementText: 'Stelling twee', statementIsActive: false, answer: null },
+        { statementId: 1, statementText: 'Stelling een', statementIsActive: true, answer: 'oneens', explanation: null },
+        { statementId: 2, statementText: 'Stelling twee', statementIsActive: false, answer: null, explanation: null },
       ]);
     });
 
@@ -55,13 +55,13 @@ void it('reads and sets party answers over HTTP', async (context) => {
       const response = await put('/parties/1/answers/1', { answer: 'neutraal' });
 
       strictEqual(response.status, StatusCodes.OK);
-      deepStrictEqual(await response.json(), { statementId: 1, statementText: 'Stelling een', statementIsActive: true, answer: 'neutraal' });
+      deepStrictEqual(await response.json(), { statementId: 1, statementText: 'Stelling een', statementIsActive: true, answer: 'neutraal', explanation: null });
       strictEqual(answerCount(1, 1), 1);
       strictEqual(database.prepare('SELECT answer FROM party_answers WHERE party_id = 2').get()?.['answer'], 'eens');
     });
 
     await context.test('inserts a new answer and clears it with null', async () => {
-      const expected = { statementId: inactiveStatementId, statementText: 'Stelling twee', statementIsActive: false };
+      const expected = { statementId: inactiveStatementId, statementText: 'Stelling twee', statementIsActive: false, explanation: null };
       const created = await put(`/parties/1/answers/${String(inactiveStatementId)}`, { answer: 'eens' });
 
       strictEqual(created.status, StatusCodes.OK);

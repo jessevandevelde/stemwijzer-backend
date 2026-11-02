@@ -4,7 +4,7 @@ import { hashPassword } from '../auth/hash-password';
 import { openDatabase } from './index';
 
 const projectRoot = resolve(__dirname, '../..');
-const seedFiles = ['seed-statements.sql', 'seed-parties.sql', 'seed-party-answers.sql'];
+const seedFiles = ['seed-statements.sql', 'seed-statement-details.sql', 'seed-parties.sql', 'seed-party-answers.sql'];
 
 const testAdminEmail = 'beheerder@stemwijzer.test';
 const testAdminPassword = 'Test1234!';

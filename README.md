@@ -218,3 +218,9 @@ Partijlogo's worden in het CMS vanaf de eigen computer geüpload in plaats van v
 
 Bestanden staan in `data/uploads` (instelbaar met `UPLOAD_DIR`) en worden net als de database niet in versiebeheer opgenomen. Een vervangen logo blijft als bestand staan.
 
+## Toelichting, partij-uitleg en weging
+
+- Stellingen hebben optioneel `title`, `theme`, `explanation` ("Wat houdt het in?"), `consequence` ("Wat betekent het?"), `argumentsFor` en `argumentsAgainst` (lijsten van maximaal 10 teksten). Ze zijn te zetten via `POST`/`PATCH /statements` en komen terug in alle stelling-responses, ook in `GET /statements?index=`. Lege tekst of `null` maakt een veld leeg. Bestaande databases krijgen de kolommen automatisch via `src/database/migrate.ts`; `npm run db:seed` vult titels en thema's voor de voorbeeldstellingen (`database/seed-statement-details.sql`).
+- Partijantwoorden hebben een optionele `explanation` (maximaal 1000 tekens). Stuur die mee met `PUT /party-admin/statements/:id` of `PUT /parties/:id/answers/:statementId`; zonder `explanation` blijft de bestaande uitleg staan. In `GET /statements?index=` staan bij elke partij ook `abbreviation`, `color` en `explanation`.
+- `POST /matching` accepteert per antwoord `important: true`. Zo'n stelling telt dubbel mee in `matchPercentage`; `matchedAnswers` en `comparedAnswers` blijven gewone aantallen. De response bevat `importantAnswers`.
+

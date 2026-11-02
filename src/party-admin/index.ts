@@ -12,8 +12,15 @@ import { validatePartyAnswer } from '../party-answers/validation';
 import type { AuthenticatedUser } from '../types/auth.interface';
 import type { PartyAnswerRecord } from '../types/party-answer.interface';
 
-function toPartyStatement(record: PartyAnswerRecord): { statementId: number, text: string, answer: PartyAnswerRecord['answer'] } {
-  return { statementId: record.statementId, text: record.statementText, answer: record.answer };
+interface PartyStatement {
+  readonly statementId: number
+  readonly text: string
+  readonly answer: PartyAnswerRecord['answer']
+  readonly explanation: string | null
+}
+
+function toPartyStatement(record: PartyAnswerRecord): PartyStatement {
+  return { statementId: record.statementId, text: record.statementText, answer: record.answer, explanation: record.explanation };
 }
 
 // De partij komt altijd uit de sessie, nooit uit de URL: een partijbeheerder kan zo alleen zijn eigen partij wijzigen.
@@ -42,7 +49,7 @@ export async function handleSetPartyAdminAnswerRequest(
   try {
     const partyId = Number(user.partyId);
     const body = await readJsonBody(request);
-    const answer = validatePartyAnswer(body);
+    const input = validatePartyAnswer(body);
 
     if (!getPartyAnswer(database, partyId, statementId)?.statementIsActive) {
       response.writeHead(StatusCodes.NOT_FOUND);
@@ -51,7 +58,7 @@ export async function handleSetPartyAdminAnswerRequest(
       return;
     }
 
-    setPartyAnswer(database, partyId, statementId, answer);
+    setPartyAnswer(database, partyId, statementId, input);
 
     const saved = getPartyAnswer(database, partyId, statementId);
 

@@ -1,10 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { Answer } from '../types/answer.interface';
-import type { MatchingResult, PartyMatch, SpectrumPosition } from '../types/matching.interface';
+import type { MatchingResult, PartyMatch, SpectrumPosition, UserAnswer } from '../types/matching.interface';
 
 const percentageScale = 100;
 const roundingScale = 100;
 const positionRoundingScale = 1000;
+const importantWeight = 2;
 
 const answerValue: Record<Answer, number> = { eens: 1, neutraal: 0, oneens: -1 };
 
@@ -37,7 +38,7 @@ function computePosition(weightedAnswers: readonly WeightedAnswer[]): SpectrumPo
   };
 }
 
-export function matchResults(database: DatabaseSync, answers: ReadonlyMap<number, Answer>): MatchingResult {
+export function matchResults(database: DatabaseSync, answers: ReadonlyMap<number, UserAnswer>): MatchingResult {
   const parties = database.prepare('SELECT id, name FROM parties WHERE is_active = 1 ORDER BY id').all();
 
   const partyAnswers = database.prepare(/* sql */ `
@@ -62,6 +63,8 @@ export function matchResults(database: DatabaseSync, answers: ReadonlyMap<number
 
     let matchedAnswers = 0;
     let comparedAnswers = 0;
+    let matchedWeight = 0;
+    let comparedWeight = 0;
     const weightedAnswers: WeightedAnswer[] = [];
 
     for (const row of partyAnswers.all(partyId)) {
@@ -77,10 +80,14 @@ export function matchResults(database: DatabaseSync, answers: ReadonlyMap<number
       const userAnswer = typeof statementId === 'number' ? answers.get(statementId) : undefined;
 
       if (userAnswer !== undefined) {
-        comparedAnswers += 1;
+        const weight = userAnswer.important ? importantWeight : 1;
 
-        if (userAnswer === answer) {
+        comparedAnswers += 1;
+        comparedWeight += weight;
+
+        if (userAnswer.answer === answer) {
           matchedAnswers += 1;
+          matchedWeight += weight;
         }
       }
     }
@@ -88,7 +95,7 @@ export function matchResults(database: DatabaseSync, answers: ReadonlyMap<number
     return {
       partyId,
       partyName,
-      matchPercentage: comparedAnswers === 0 ? null : Math.round(matchedAnswers / comparedAnswers * percentageScale * roundingScale) / roundingScale,
+      matchPercentage: comparedWeight === 0 ? null : Math.round(matchedWeight / comparedWeight * percentageScale * roundingScale) / roundingScale,
       matchedAnswers,
       comparedAnswers,
       missingAnswers: answers.size - comparedAnswers,
@@ -106,12 +113,14 @@ export function matchResults(database: DatabaseSync, answers: ReadonlyMap<number
 
   for (const row of statementWeights) {
     const { id, economicWeight, culturalWeight } = row;
-    const answer = typeof id === 'number' ? answers.get(id) : undefined;
+    const answer = typeof id === 'number' ? answers.get(id)?.answer : undefined;
 
     if (answer !== undefined && typeof economicWeight === 'number' && typeof culturalWeight === 'number') {
       userWeightedAnswers.push({ answer, economicWeight, culturalWeight });
     }
   }
 
-  return { totalAnswers: answers.size, matches, userPosition: computePosition(userWeightedAnswers) };
+  const importantAnswers = [...answers.values()].filter(item => item.important).length;
+
+  return { totalAnswers: answers.size, importantAnswers, matches, userPosition: computePosition(userWeightedAnswers) };
 }

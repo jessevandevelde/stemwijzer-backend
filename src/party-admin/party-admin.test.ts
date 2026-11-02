@@ -1,5 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
 import { hashPassword } from '../auth/hash-password';
@@ -12,6 +12,7 @@ const partyCount = 2;
 const superadminId = 2;
 const tokenLength = 64;
 const updatedSeats = 12;
+const tooLongExplanation = 1001;
 
 function hasToken(value: unknown): value is { token: string, user: unknown } {
   return typeof value === 'object' && value !== null && 'token' in value && typeof value.token === 'string' && 'user' in value;
@@ -84,8 +85,8 @@ void it('lets party admins manage only the answers of their own party', async (c
       deepStrictEqual(await response.json(), {
         party: { id: 1, name: 'Partij A' },
         statements: [
-          { statementId: 1, text: 'Stelling een', answer: 'oneens' },
-          { statementId: 3, text: 'Stelling drie', answer: null },
+          { statementId: 1, text: 'Stelling een', answer: 'oneens', explanation: null },
+          { statementId: 3, text: 'Stelling drie', answer: null, explanation: null },
         ],
       });
     });
@@ -94,12 +95,12 @@ void it('lets party admins manage only the answers of their own party', async (c
       const updated = await request('PUT', '/party-admin/statements/1', partyAdmin.token, { answer: 'eens' });
 
       strictEqual(updated.status, StatusCodes.OK);
-      deepStrictEqual(await updated.json(), { statementId: 1, text: 'Stelling een', answer: 'eens' });
+      deepStrictEqual(await updated.json(), { statementId: 1, text: 'Stelling een', answer: 'eens', explanation: null });
 
       const created = await request('PUT', '/party-admin/statements/3', partyAdmin.token, { answer: 'neutraal' });
 
       strictEqual(created.status, StatusCodes.OK);
-      deepStrictEqual(await created.json(), { statementId: 3, text: 'Stelling drie', answer: 'neutraal' });
+      deepStrictEqual(await created.json(), { statementId: 3, text: 'Stelling drie', answer: 'neutraal', explanation: null });
       deepStrictEqual(
         database.prepare('SELECT party_id AS partyId, statement_id AS statementId, answer FROM party_answers ORDER BY party_id, statement_id').all()
           .map(row => ({ ...row })),
@@ -109,6 +110,34 @@ void it('lets party admins manage only the answers of their own party', async (c
           { partyId: 2, statementId: 1, answer: 'eens' },
         ],
       );
+    });
+
+    await context.test('stores an explanation with the answer and keeps it when only the answer changes', async () => {
+      const withExplanation = await request('PUT', '/party-admin/statements/1', partyAdmin.token, { answer: 'eens', explanation: '  Omdat het eerlijker is.  ' });
+
+      strictEqual(withExplanation.status, StatusCodes.OK);
+      deepStrictEqual(await withExplanation.json(), { statementId: 1, text: 'Stelling een', answer: 'eens', explanation: 'Omdat het eerlijker is.' });
+
+      const answerOnly = await request('PUT', '/party-admin/statements/1', partyAdmin.token, { answer: 'neutraal' });
+
+      deepStrictEqual(await answerOnly.json(), { statementId: 1, text: 'Stelling een', answer: 'neutraal', explanation: 'Omdat het eerlijker is.' });
+
+      const publicStatement = await fetch(`${baseUrl}/statements?index=0`);
+      const publicBody: unknown = await publicStatement.json();
+
+      ok(typeof publicBody === 'object' && publicBody !== null && 'partyAnswers' in publicBody && Array.isArray(publicBody.partyAnswers));
+      deepStrictEqual(publicBody.partyAnswers[0], { partyId: 1, partyName: 'Partij A', abbreviation: null, color: null, answer: 'neutraal', explanation: 'Omdat het eerlijker is.' });
+
+      const cleared = await request('PUT', '/party-admin/statements/1', partyAdmin.token, { answer: 'eens', explanation: '' });
+
+      deepStrictEqual(await cleared.json(), { statementId: 1, text: 'Stelling een', answer: 'eens', explanation: null });
+
+      for (const body of [{ answer: null, explanation: 'Zonder standpunt' }, { answer: 'eens', explanation: 'x'.repeat(tooLongExplanation) }, { answer: 'eens', explanation: 5 }]) {
+        const response = await request('PUT', '/party-admin/statements/1', partyAdmin.token, body);
+
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
+        await response.text();
+      }
     });
 
     await context.test('rejects inactive or unknown statements and invalid answers', async () => {

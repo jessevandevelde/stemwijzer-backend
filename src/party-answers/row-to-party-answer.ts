@@ -2,7 +2,7 @@ import type { SQLOutputValue } from 'node:sqlite';
 import type { PartyAnswerRecord } from '../types/party-answer.interface';
 
 export function rowToPartyAnswer(row: Record<string, SQLOutputValue>): PartyAnswerRecord {
-  const { statementId, statementText, statementIsActive, answer } = row;
+  const { statementId, statementText, statementIsActive, answer, explanation } = row;
 
   if (typeof statementId !== 'number' || typeof statementText !== 'string') {
     throw new Error('De database heeft ongeldige partijantwoorden teruggegeven.');
@@ -12,5 +12,5 @@ export function rowToPartyAnswer(row: Record<string, SQLOutputValue>): PartyAnsw
     throw new Error('De database heeft ongeldige partijantwoorden teruggegeven.');
   }
 
-  return { statementId, statementText, statementIsActive: statementIsActive === 1, answer };
+  return { statementId, statementText, statementIsActive: statementIsActive === 1, answer, explanation: typeof explanation === 'string' ? explanation : null };
 }

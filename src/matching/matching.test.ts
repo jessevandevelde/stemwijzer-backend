@@ -1,5 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { it } from 'node:test';
 import { openDatabase } from '../database';
@@ -15,6 +15,9 @@ interface SpectrumResultBody {
 function isSpectrumResultBody(value: unknown): value is SpectrumResultBody {
   return typeof value === 'object' && value !== null && 'matches' in value && Array.isArray(value.matches) && 'userPosition' in value;
 }
+
+const importantStatementId = 30;
+const twoEqualPartyId = 2;
 
 void it('matches a complete submission without storing user answers', async (context) => {
   const database = openDatabase(':memory:');
@@ -68,6 +71,7 @@ void it('matches a complete submission without storing user answers', async (con
       strictEqual(response.headers.get('content-type'), 'application/json; charset=utf-8');
       deepStrictEqual(await response.json(), {
         totalAnswers: 3,
+        importantAnswers: 0,
         matches: [
           { partyId: 1, partyName: 'Alles gelijk', matchPercentage: 100, matchedAnswers: 3, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
           { partyId: 7, partyName: 'Gelijke score', matchPercentage: 100, matchedAnswers: 3, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
@@ -168,13 +172,36 @@ void it('matches a complete submission without storing user answers', async (con
       await response.text();
     });
 
+    await context.test('counts important statements double in the percentage', async () => {
+      const weighted = answers.map(item => (item.statementId === importantStatementId ? { ...item, important: true } : item));
+      const response = await post({ answers: weighted });
+      const body: unknown = await response.json();
+
+      strictEqual(response.status, StatusCodes.OK);
+      ok(typeof body === 'object' && body !== null && 'importantAnswers' in body && 'matches' in body && Array.isArray(body.matches));
+      strictEqual(body.importantAnswers, 1);
+
+      const twoEqual: unknown = body.matches.find((match: unknown) => typeof match === 'object' && match !== null && 'partyId' in match && match.partyId === twoEqualPartyId);
+
+      ok(typeof twoEqual === 'object' && twoEqual !== null);
+      deepStrictEqual(
+        { ...twoEqual },
+        { partyId: 2, partyName: 'Twee gelijk', matchPercentage: 50, matchedAnswers: 2, comparedAnswers: 3, missingAnswers: 0, economicPosition: 0, culturalPosition: 0 },
+      );
+
+      const invalid = await post({ answers: answers.map(item => ({ ...item, important: 'ja' })) });
+
+      strictEqual(invalid.status, StatusCodes.BAD_REQUEST);
+      await invalid.text();
+    });
+
     await context.test('returns an empty result when no active parties exist', async () => {
       database.exec('UPDATE parties SET is_active = 0');
 
       const response = await post({ answers });
 
       strictEqual(response.status, StatusCodes.OK);
-      deepStrictEqual(await response.json(), { totalAnswers: 3, matches: [], userPosition: { economicPosition: 0, culturalPosition: 0 } });
+      deepStrictEqual(await response.json(), { totalAnswers: 3, importantAnswers: 0, matches: [], userPosition: { economicPosition: 0, culturalPosition: 0 } });
     });
 
     await context.test('rejects a submission after statements have changed', async () => {
