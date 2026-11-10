@@ -22,6 +22,7 @@ import {
 } from './parties';
 import { handleListPartyAnswersRequest, handleSetPartyAnswerRequest } from './party-answers';
 import {
+  handleChangePartyAdminPasswordRequest,
   handleGetPartyAdminPartyRequest,
   handleListPartyAdminStatementsRequest,
   handleSetPartyAdminAnswerRequest,
@@ -375,6 +376,23 @@ export function createApp(database: DatabaseSync, uploadDir = defaultUploadDir):
         }
         else if (user) {
           void handleUpdatePartyAdminPartyRequest(database, user, request, response);
+        }
+
+        return;
+      }
+
+      if (url.pathname === '/party-admin/password') {
+        if (method !== 'PATCH') {
+          response.writeHead(StatusCodes.METHOD_NOT_ALLOWED, { allow: 'PATCH' });
+          response.end(JSON.stringify({ error: 'Gebruik PATCH voor deze route.' }));
+
+          return;
+        }
+
+        const user = authorize(database, request, response, 'party-admin');
+
+        if (user) {
+          void handleChangePartyAdminPasswordRequest(database, user, request, response);
         }
 
         return;

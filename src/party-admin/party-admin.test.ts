@@ -13,6 +13,7 @@ const superadminId = 2;
 const tokenLength = 64;
 const updatedSeats = 12;
 const tooLongExplanation = 1001;
+const secondPartyId = 2;
 
 function hasToken(value: unknown): value is { token: string, user: unknown } {
   return typeof value === 'object' && value !== null && 'token' in value && typeof value.token === 'string' && 'user' in value;
@@ -249,6 +250,63 @@ void it('lets party admins manage only the answers of their own party', async (c
       }
 
       strictEqual(database.prepare('SELECT name FROM parties WHERE id = 1').get()?.['name'], 'Partij A Nieuw');
+    });
+
+    await context.test('lets a party admin change only their own password', async () => {
+      database.prepare('INSERT INTO party_admins (id, party_id, name, email, password_hash) VALUES (?, ?, ?, ?, ?)')
+        .run(secondPartyId, secondPartyId, 'Beheerder B', 'b@example.test', hashPassword('Test1234!'));
+
+      const partyAdminB = await login('b@example.test');
+
+      for (const body of [
+        {},
+        [],
+        { newPassword: 'Nieuw12345' },
+        { currentPassword: 'Test1234!' },
+        { currentPassword: 'Test1234!', newPassword: 'kort' },
+        { currentPassword: 'fout-wachtwoord', newPassword: 'Nieuw12345' },
+        { currentPassword: 'Test1234!', newPassword: 'Nieuw12345', email: 'ander@example.test' },
+      ]) {
+        const response = await request('PATCH', '/party-admin/password', partyAdminB.token, body);
+
+        strictEqual(response.status, StatusCodes.BAD_REQUEST, JSON.stringify(body));
+        await response.text();
+      }
+
+      const cases: [Promise<Response>, number][] = [
+        [request('PATCH', '/party-admin/password', null, { currentPassword: 'Test1234!', newPassword: 'Nieuw12345' }), StatusCodes.UNAUTHORIZED],
+        [request('PATCH', '/party-admin/password', superadmin.token, { currentPassword: 'Test1234!', newPassword: 'Nieuw12345' }), StatusCodes.FORBIDDEN],
+        [request('GET', '/party-admin/password', partyAdminB.token), StatusCodes.METHOD_NOT_ALLOWED],
+      ];
+
+      for (const [pending, status] of cases) {
+        const response = await pending;
+
+        strictEqual(response.status, status);
+        await response.text();
+      }
+
+      const changed = await request('PATCH', '/party-admin/password', partyAdminB.token, { currentPassword: 'Test1234!', newPassword: 'Nieuw12345' });
+
+      strictEqual(changed.status, StatusCodes.NO_CONTENT);
+      await changed.text();
+
+      const oldSession = await request('GET', '/party-admin/statements', partyAdminB.token);
+
+      strictEqual(oldSession.status, StatusCodes.UNAUTHORIZED);
+      await oldSession.text();
+
+      for (const [password, status] of [['Test1234!', StatusCodes.UNAUTHORIZED], ['Nieuw12345', StatusCodes.OK]] as const) {
+        const response = await request('POST', '/auth/login', null, { email: 'b@example.test', password });
+
+        strictEqual(response.status, status, password);
+        await response.text();
+      }
+
+      const otherAdmin = await request('GET', '/party-admin/statements', partyAdmin.token);
+
+      strictEqual(otherAdmin.status, StatusCodes.OK);
+      await otherAdmin.text();
     });
 
     await context.test('ends the session when the party admin is removed', async () => {

@@ -1,5 +1,5 @@
 import { RequestError } from '../http/request-error';
-import type { CreatePartyAdminInput, UpdatePartyAdminInput } from '../types/party-admin.interface';
+import type { ChangePasswordInput, CreatePartyAdminInput, UpdatePartyAdminInput } from '../types/party-admin.interface';
 
 const maximumNameLength = 100;
 const maximumEmailLength = 100;
@@ -76,4 +76,24 @@ export function validateUpdatePartyAdmin(body: unknown): UpdatePartyAdminInput {
   }
 
   return result;
+}
+
+// Het huidige wachtwoord wordt alleen op aanwezigheid gecontroleerd; of het klopt, bepaalt verifyPassword.
+export function validatePasswordChange(body: unknown): ChangePasswordInput {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new RequestError('Stuur een JSON-object met currentPassword en newPassword.');
+  }
+
+  if (Object.keys(body).some(key => key !== 'currentPassword' && key !== 'newPassword')) {
+    throw new RequestError('Alleen currentPassword en newPassword zijn toegestaan.');
+  }
+
+  const fields: Record<string, unknown> = { ...body };
+  const { currentPassword, newPassword } = fields;
+
+  if (typeof currentPassword !== 'string' || currentPassword.length === 0) {
+    throw new RequestError('currentPassword is verplicht.');
+  }
+
+  return { currentPassword, newPassword: validatePassword(newPassword) };
 }
