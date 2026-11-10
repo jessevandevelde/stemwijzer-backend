@@ -14,3 +14,8 @@ export interface CreatePartyAdminInput {
 }
 
 export type UpdatePartyAdminInput = Partial<CreatePartyAdminInput>;
+
+export interface ChangePasswordInput {
+  readonly currentPassword: string
+  readonly newPassword: string
+}

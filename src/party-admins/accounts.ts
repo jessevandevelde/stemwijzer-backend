@@ -36,6 +36,12 @@ export function isEmailTaken(database: DatabaseSync, email: string, exceptPartyA
   return superadmin !== undefined || partyAdmin !== undefined;
 }
 
+export function getPartyAdminPasswordHash(database: DatabaseSync, id: number): string | undefined {
+  const row = database.prepare('SELECT password_hash AS passwordHash FROM party_admins WHERE id = ?').get(id);
+
+  return typeof row?.['passwordHash'] === 'string' ? row['passwordHash'] : undefined;
+}
+
 export function createPartyAdmin(database: DatabaseSync, partyId: number, input: CreatePartyAdminInput): number {
   const result = database.prepare('INSERT INTO party_admins (party_id, name, email, password_hash) VALUES (?, ?, ?, ?)')
     .run(partyId, input.name, input.email, hashPassword(input.password));
