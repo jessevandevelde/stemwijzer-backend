@@ -189,7 +189,8 @@ Alle vier routes geven `400` bij ongeldige invoer of een ongeldig ID in de URL, 
   - `PUT /party-admin/statements/:id` met `{ "answer": "eens" | "neutraal" | "oneens" | null }`: het standpunt van de eigen partij op een actieve stelling opslaan.
   - `GET /party-admin/party`: de gegevens van de eigen partij, in hetzelfde formaat als `GET /parties/:id`.
   - `PATCH /party-admin/party` met één of meer van `name`, `description`, `imageUrl`, `abbreviation`, `color`, `seats` en `leader`, volgens dezelfde validatie als `PATCH /parties/:id`. Alleen `isActive` is voorbehouden aan superadmins en geeft `403`.
-- De partij komt altijd uit de sessie, niet uit de URL. Een partijbeheerder kan daardoor geen andere partij wijzigen, de eigen partij niet (de)activeren en zijn eigen account niet wijzigen.
+  - `PATCH /party-admin/password` met `{ "currentPassword": "...", "newPassword": "..." }`: het eigen wachtwoord wijzigen. Het nieuwe wachtwoord moet 8 tot en met 255 tekens hebben. Een onjuist huidig wachtwoord geeft `400`. Bij succes volgt `204` en wordt de partijbeheerder overal uitgelogd.
+- De partij en het account komen altijd uit de sessie, niet uit de URL. Een partijbeheerder kan daardoor geen andere partij wijzigen, de eigen partij niet (de)activeren en van het eigen account alleen het wachtwoord wijzigen.
 
 Superadmins beheren de inloggegevens van partijen via de partijpagina in het CMS, of via deze routes (allemaal alleen voor superadmins):
 
